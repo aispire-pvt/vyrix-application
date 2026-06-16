@@ -1,0 +1,16 @@
+# Dependencies & build output
+node_modules/
+dist/
+
+# Secrets / environment files
+.env
+.env.local
+**/.env
+
+# Local Claude / editor settings
+.claude/
+.kiro/
+
+# Misc
+*.log
+.DS_Store
