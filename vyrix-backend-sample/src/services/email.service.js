@@ -1,48 +1,6 @@
 const nodemailer = require("nodemailer");
 
-// Cache a single transporter so we don't re-create an Ethereal test account
-// (or re-open a Gmail connection) on every email.
-let transporterPromise = null;
-
-async function getTransporter() {
-    if (transporterPromise) return transporterPromise;
-
-    transporterPromise = (async () => {
-        // If real Gmail credentials are provided, use them; otherwise fall back
-        // to an Ethereal test inbox (no real delivery — preview URL in console).
-        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-            console.log("[email] Using Gmail SMTP as", process.env.EMAIL_USER);
-            return nodemailer.createTransport({
-                service: "gmail",
-                auth: {
-                    user: process.env.EMAIL_USER,
-                    pass: process.env.EMAIL_PASS,
-                },
-            });
-        }
-
-        console.log(
-            "[email] No EMAIL_USER/EMAIL_PASS set — using Ethereal test account (emails are not delivered, open the preview URL)."
-        );
-        const testAccount = await nodemailer.createTestAccount();
-        return nodemailer.createTransport({
-            host: "smtp.ethereal.email",
-            port: 587,
-            secure: false,
-            auth: {
-                user: testAccount.user,
-                pass: testAccount.pass,
-            },
-        });
-    })();
-
-    return transporterPromise;
-}
-
-// Sender shown to the recipient. Uses the configured Gmail address if present.
-const FROM_ADDRESS = process.env.EMAIL_USER
-    ? `"Vyrix" <${process.env.EMAIL_USER}>`
-    : '"Vyrix" <no-reply@vyrix.com>';
+// ---------- Email content (shared by all delivery methods) ----------
 
 function buildHtml(otp) {
     return `
@@ -68,27 +26,96 @@ function buildHtml(otp) {
     </div>`;
 }
 
-async function sendOTPEmail(email, otp) {
-    const transporter = await getTransporter();
+function buildText(otp) {
+    return (
+        `Hello,\n\n` +
+        `Use the verification code below to confirm your email address and continue setting up your Vyrix account.\n\n` +
+        `Verification code: ${otp}\n\n` +
+        `This code will expire in 10 minutes. If you didn't request this code, you can safely ignore this email.\n\n` +
+        `— The Vyrix Team`
+    );
+}
 
-    const info = await transporter.sendMail({
-        from: FROM_ADDRESS,
-        to: email,
-        subject: "Your Vyrix verification code",
-        text:
-            `Hello,\n\n` +
-            `Use the verification code below to confirm your email address and continue setting up your Vyrix account.\n\n` +
-            `Verification code: ${otp}\n\n` +
-            `This code will expire in 10 minutes. If you didn't request this code, you can safely ignore this email.\n\n` +
-            `— The Vyrix Team`,
-        html: buildHtml(otp),
+const SUBJECT = "Your Vyrix verification code";
+const SENDER_EMAIL = process.env.BREVO_SENDER || process.env.EMAIL_USER || "no-reply@vyrix.com";
+const SENDER_NAME = "Vyrix";
+
+// ---------- Method 1: Brevo HTTP API (works on hosts that block SMTP, e.g. Render) ----------
+
+async function sendViaBrevo(email, otp) {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+            "api-key": process.env.BREVO_API_KEY,
+            "Content-Type": "application/json",
+            accept: "application/json",
+        },
+        body: JSON.stringify({
+            sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+            to: [{ email }],
+            subject: SUBJECT,
+            htmlContent: buildHtml(otp),
+            textContent: buildText(otp),
+        }),
     });
 
-    // For Ethereal, this prints a URL where the email can be viewed in a browser.
+    if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`Brevo send failed (${res.status}): ${detail}`);
+    }
+    console.log("[email] Sent via Brevo API to", email);
+}
+
+// ---------- Method 2: SMTP (Gmail or Ethereal) — used for local development ----------
+
+let transporterPromise = null;
+
+async function getTransporter() {
+    if (transporterPromise) return transporterPromise;
+
+    transporterPromise = (async () => {
+        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+            console.log("[email] Using Gmail SMTP as", process.env.EMAIL_USER);
+            return nodemailer.createTransport({
+                service: "gmail",
+                auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+            });
+        }
+        console.log("[email] No email credentials set — using Ethereal test inbox (preview URL in console).");
+        const testAccount = await nodemailer.createTestAccount();
+        return nodemailer.createTransport({
+            host: "smtp.ethereal.email",
+            port: 587,
+            secure: false,
+            auth: { user: testAccount.user, pass: testAccount.pass },
+        });
+    })();
+
+    return transporterPromise;
+}
+
+async function sendViaSmtp(email, otp) {
+    const transporter = await getTransporter();
+    const info = await transporter.sendMail({
+        from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`,
+        to: email,
+        subject: SUBJECT,
+        text: buildText(otp),
+        html: buildHtml(otp),
+    });
     const previewUrl = nodemailer.getTestMessageUrl(info);
     if (previewUrl) console.log("[email] Preview URL:", previewUrl);
+}
 
-    return info;
+// ---------- Public API ----------
+
+// Prefer the Brevo HTTP API when a key is present (required on Render);
+// otherwise fall back to SMTP for local development.
+async function sendOTPEmail(email, otp) {
+    if (process.env.BREVO_API_KEY) {
+        return sendViaBrevo(email, otp);
+    }
+    return sendViaSmtp(email, otp);
 }
 
 module.exports = { sendOTPEmail };
