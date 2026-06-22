@@ -1,4 +1,5 @@
 const userModel = require("../models/user.models");
+const profileModel = require("../models/profile.model");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
@@ -112,4 +113,45 @@ async function loginUser(req, res) {
     }
 }
 
-module.exports = { registerUser, loginUser };
+// Return the currently authenticated user (from the JWT cookie).
+async function getMe(req, res) {
+    try {
+        const user = await userModel
+            .findById(req.user.id)
+            .select("-password -otp -otpExpiresAt");
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found",
+            });
+        }
+
+        const profile = await profileModel.findOne({ user: user._id });
+        const firstName =
+            (user.name || "").trim().split(" ")[0] || user.username || "";
+
+        return res.status(200).json({
+            success: true,
+            user: {
+                id: user._id,
+                firstName,
+                name: user.name,
+                email: user.email,
+                username: user.username,
+                profession: user.profession,
+                emailVerified: user.emailVerified,
+                onboardingCompleted: user.onboardingCompleted,
+                profilePic: (profile && profile.profile_pic) || null,
+            },
+        });
+    } catch (error) {
+        console.error("getMe error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error",
+        });
+    }
+}
+
+module.exports = { registerUser, loginUser, getMe };
