@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useGoogleLogin } from '@react-oauth/google'
 import api from '../api/axios'
 import InputField from '../components/ui/InputField'
 import Button from '../components/ui/Button'
@@ -19,6 +20,26 @@ export default function Login() {
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
+  // Google sign-in (implicit flow → access token → backend verifies + upserts).
+  const googleLogin = useGoogleLogin({
+    scope: 'openid email profile',
+    onSuccess: async (tokenResponse) => {
+      setError('')
+      setLoading(true)
+      try {
+        const { data } = await api.post('/api/auth/google', {
+          accessToken: tokenResponse.access_token,
+        })
+        navigate(data.onboardingCompleted ? '/home' : '/profile')
+      } catch (err) {
+        setError(err.response?.data?.message || 'Google sign-in failed. Please try again.')
+      } finally {
+        setLoading(false)
+      }
+    },
+    onError: () => setError('Google sign-in was cancelled.'),
+  })
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
@@ -31,7 +52,14 @@ export default function Login() {
     setLoading(true)
     try {
       await api.post('/api/auth/login', form)
-      navigate('/home')
+      // Gate: only verified + onboarded users reach the app; others finish onboarding.
+      const { data } = await api.get('/api/auth/me')
+      const u = data.user
+      if (!u?.emailVerified || !u?.onboardingCompleted) {
+        navigate('/profile')
+      } else {
+        navigate('/home')
+      }
     } catch (err) {
       setError(
         err.response?.data?.message || 'Something went wrong. Please try again.'
@@ -101,7 +129,7 @@ export default function Login() {
 
         <Divider className="mt-6 w-full" />
 
-        <Button variant="outline" className="mt-6" type="button">
+        <Button variant="outline" className="mt-6" type="button" onClick={() => googleLogin()}>
           <img src={googleIcon} alt="" className="h-[22px] w-[22px]" />
           Google
         </Button>

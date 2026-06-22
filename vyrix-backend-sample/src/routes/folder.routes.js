@@ -1,8 +1,9 @@
 const router = require("express").Router();
-const { authUser } = require("../middlewares/auth.middleware");
+const { authUser, requireOnboarded } = require("../middlewares/auth.middleware");
 const folderController = require("../controllers/folder.controller");
 
 router.use(authUser); // all folder routes require auth
+router.use(requireOnboarded); // ...and a verified + onboarded account
 
 router.post("/", folderController.createFolder);
 router.get("/", folderController.getMyFolders);

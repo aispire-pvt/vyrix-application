@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api/axios'
 import InputField from '../components/ui/InputField'
@@ -20,6 +20,37 @@ export default function Profile() {
   const [info, setInfo] = useState('')
   const [sendingOtp, setSendingOtp] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  // Google users arrive already email-verified → skip the OTP step.
+  const [alreadyVerified, setAlreadyVerified] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    api
+      .get('/api/auth/me')
+      .then(({ data }) => {
+        if (!active) return
+        const u = data.user
+        if (u?.onboardingCompleted) {
+          navigate('/home')
+          return
+        }
+        setAlreadyVerified(!!u?.emailVerified)
+        setForm((f) => ({
+          ...f,
+          username: u?.username || '',
+          profession: u?.profession || '',
+        }))
+        setChecking(false)
+      })
+      .catch(() => {
+        if (active) navigate('/login')
+      })
+    return () => {
+      active = false
+    }
+  }, [navigate])
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
@@ -49,17 +80,23 @@ export default function Profile() {
     }
   }
 
-  // Step 2: verify the OTP, then save the profile and continue.
+  // Verify the OTP (unless already verified via Google), then save the profile.
   const handleContinue = async () => {
     setError('')
-    if (!form.otp) {
+    if (!form.username.trim() || !form.profession.trim()) {
+      setError('Please enter your username and profession.')
+      return
+    }
+    if (!alreadyVerified && !form.otp) {
       setError('Please enter the verification code sent to your email.')
       return
     }
 
     setSubmitting(true)
     try {
-      await api.post('/api/onboarding/verify-otp', { otp: form.otp })
+      if (!alreadyVerified) {
+        await api.post('/api/onboarding/verify-otp', { otp: form.otp })
+      }
 
       const fd = new FormData()
       fd.append('username', form.username)
@@ -73,11 +110,19 @@ export default function Profile() {
       navigate('/tutorials')
     } catch (err) {
       setError(
-        err.response?.data?.message || 'Verification failed. Please try again.'
+        err.response?.data?.message || 'Something went wrong. Please try again.'
       )
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (checking) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-black">
+        <p className="font-unbounded text-lg text-[#d5d5d5]">Loading...</p>
+      </div>
+    )
   }
 
   return (
@@ -134,49 +179,71 @@ export default function Profile() {
             />
           </div>
 
-          <Button
-            variant="primary"
-            className="mt-7"
-            type="button"
-            onClick={handleSendOtp}
-          >
-            {sendingOtp
-              ? 'Sending code...'
-              : otpSent
-                ? 'Resend code'
-                : 'Verify your Email'}
-          </Button>
+          {/* Google users are already verified → straight to Continue.
+              Password users verify their email with an OTP first. */}
+          {alreadyVerified ? (
+            <>
+              {error && (
+                <p className="mt-3 text-center font-sf text-[13px] text-red-400">
+                  {error}
+                </p>
+              )}
+              <Button
+                variant="primary"
+                className="mt-7"
+                type="button"
+                onClick={handleContinue}
+              >
+                {submitting ? 'Please wait...' : 'Continue'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="primary"
+                className="mt-7"
+                type="button"
+                onClick={handleSendOtp}
+              >
+                {sendingOtp
+                  ? 'Sending code...'
+                  : otpSent
+                    ? 'Resend code'
+                    : 'Verify your Email'}
+              </Button>
 
-          {/* OTP — shown after a code has been sent */}
-          {otpSent && (
-            <InputField
-              className="mt-5 w-[206px] self-center"
-              placeholder="Enter OTP"
-              inputClassName="text-center"
-              value={form.otp}
-              onChange={update('otp')}
-            />
-          )}
+              {/* OTP — shown after a code has been sent */}
+              {otpSent && (
+                <InputField
+                  className="mt-5 w-[206px] self-center"
+                  placeholder="Enter OTP"
+                  inputClassName="text-center"
+                  value={form.otp}
+                  onChange={update('otp')}
+                />
+              )}
 
-          {info && (
-            <p className="mt-3 text-center font-sf text-[13px] text-vyrix-placeholder">
-              {info}
-            </p>
-          )}
-          {error && (
-            <p className="mt-3 text-center font-sf text-[13px] text-red-400">
-              {error}
-            </p>
-          )}
+              {info && (
+                <p className="mt-3 text-center font-sf text-[13px] text-vyrix-placeholder">
+                  {info}
+                </p>
+              )}
+              {error && (
+                <p className="mt-3 text-center font-sf text-[13px] text-red-400">
+                  {error}
+                </p>
+              )}
 
-          <button
-            type="button"
-            onClick={handleContinue}
-            disabled={!otpSent || submitting}
-            className="mt-5 text-center font-sf text-[14px] font-bold text-vyrix-link-purple disabled:opacity-50"
-          >
-            {submitting ? 'Please wait...' : 'Continue'}
-          </button>
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={!otpSent || submitting}
+                className="mt-5 text-center font-sf text-[14px] font-bold text-vyrix-link-purple disabled:opacity-50"
+              >
+                {submitting ? 'Please wait...' : 'Continue'}
+              </button>
+            </>
+          )}
         </div>
       </section>
     </div>

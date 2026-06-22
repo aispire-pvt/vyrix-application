@@ -1,8 +1,9 @@
 const router = require("express").Router();
-const { authUser } = require("../middlewares/auth.middleware");
+const { authUser, requireOnboarded } = require("../middlewares/auth.middleware");
 const docController = require("../controllers/document.controller");
 
 router.use(authUser); // all doc routes require auth
+router.use(requireOnboarded); // ...and a verified + onboarded account
 
 router.post("/", docController.createDocument);
 router.get("/", docController.getMyDocuments);

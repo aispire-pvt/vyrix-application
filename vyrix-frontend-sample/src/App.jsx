@@ -8,6 +8,7 @@ import Home from './pages/Home'
 import Editor from './pages/Editor'
 import Folder from './pages/Folder'
 import AllFiles from './pages/AllFiles'
+import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
   return (
@@ -18,10 +19,15 @@ export default function App() {
       <Route path="/profile" element={<Profile />} />
       <Route path="/tutorials" element={<Tutorials />} />
       <Route path="/tutorials/next" element={<TutorialsNext />} />
-      <Route path="/home" element={<Home />} />
-      <Route path="/doc/:id" element={<Editor />} />
-      <Route path="/folder/:id" element={<Folder />} />
-      <Route path="/all-files" element={<AllFiles />} />
+
+      {/* Authenticated app — requires verified email + completed onboarding */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/home" element={<Home />} />
+        <Route path="/doc/:id" element={<Editor />} />
+        <Route path="/folder/:id" element={<Folder />} />
+        <Route path="/all-files" element={<AllFiles />} />
+      </Route>
+
       <Route path="*" element={<Navigate to="/signup" replace />} />
     </Routes>
   )

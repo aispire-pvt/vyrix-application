@@ -12,7 +12,12 @@ const userSchema= new mongoose.Schema({
     },
     password:{
         type:String,
-        required:true
+        // Not required: Google (OAuth) accounts have no local password.
+        default:null
+    },
+    googleId:{
+        type:String,
+        default:null
     },
     username:{
         type:String,

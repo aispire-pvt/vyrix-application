@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useGoogleLogin } from '@react-oauth/google'
 import api from '../api/axios'
 import InputField from '../components/ui/InputField'
 import Button from '../components/ui/Button'
@@ -22,6 +23,26 @@ export default function Signup() {
   const [loading, setLoading] = useState(false)
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value })
+
+  // Continue with Google (implicit flow → access token → backend verifies + upserts).
+  const googleLogin = useGoogleLogin({
+    scope: 'openid email profile',
+    onSuccess: async (tokenResponse) => {
+      setError('')
+      setLoading(true)
+      try {
+        const { data } = await api.post('/api/auth/google', {
+          accessToken: tokenResponse.access_token,
+        })
+        navigate(data.onboardingCompleted ? '/home' : '/profile')
+      } catch (err) {
+        setError(err.response?.data?.message || 'Google sign-in failed. Please try again.')
+      } finally {
+        setLoading(false)
+      }
+    },
+    onError: () => setError('Google sign-in was cancelled.'),
+  })
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -128,7 +149,7 @@ export default function Signup() {
 
           <Divider className="mt-5" />
 
-          <Button variant="outline" className="mt-5" type="button">
+          <Button variant="outline" className="mt-5" type="button" onClick={() => googleLogin()}>
             <img src={googleIcon} alt="" className="h-[22px] w-[22px]" />
             Google
           </Button>

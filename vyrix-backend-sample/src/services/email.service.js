@@ -1,6 +1,5 @@
-const nodemailer = require("nodemailer");
-
-// ---------- Email content (shared by all delivery methods) ----------
+// Transactional email via the Brevo HTTP API.
+// (Render and most PaaS hosts block raw SMTP, so we use Brevo's REST endpoint.)
 
 function buildHtml(otp) {
     return `
@@ -37,12 +36,16 @@ function buildText(otp) {
 }
 
 const SUBJECT = "Your Vyrix verification code";
-const SENDER_EMAIL = process.env.BREVO_SENDER || process.env.EMAIL_USER || "no-reply@vyrix.com";
+const SENDER_EMAIL = process.env.BREVO_SENDER || "no-reply@vyrix.com";
 const SENDER_NAME = "Vyrix";
 
-// ---------- Method 1: Brevo HTTP API (works on hosts that block SMTP, e.g. Render) ----------
+async function sendOTPEmail(email, otp) {
+    // Dev convenience: with no Brevo key configured, log the code instead of failing.
+    if (!process.env.BREVO_API_KEY) {
+        console.log(`[email] BREVO_API_KEY not set — dev fallback. OTP for ${email}: ${otp}`);
+        return;
+    }
 
-async function sendViaBrevo(email, otp) {
     const res = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
@@ -64,58 +67,6 @@ async function sendViaBrevo(email, otp) {
         throw new Error(`Brevo send failed (${res.status}): ${detail}`);
     }
     console.log("[email] Sent via Brevo API to", email);
-}
-
-// ---------- Method 2: SMTP (Gmail or Ethereal) — used for local development ----------
-
-let transporterPromise = null;
-
-async function getTransporter() {
-    if (transporterPromise) return transporterPromise;
-
-    transporterPromise = (async () => {
-        if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-            console.log("[email] Using Gmail SMTP as", process.env.EMAIL_USER);
-            return nodemailer.createTransport({
-                service: "gmail",
-                auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-            });
-        }
-        console.log("[email] No email credentials set — using Ethereal test inbox (preview URL in console).");
-        const testAccount = await nodemailer.createTestAccount();
-        return nodemailer.createTransport({
-            host: "smtp.ethereal.email",
-            port: 587,
-            secure: false,
-            auth: { user: testAccount.user, pass: testAccount.pass },
-        });
-    })();
-
-    return transporterPromise;
-}
-
-async function sendViaSmtp(email, otp) {
-    const transporter = await getTransporter();
-    const info = await transporter.sendMail({
-        from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`,
-        to: email,
-        subject: SUBJECT,
-        text: buildText(otp),
-        html: buildHtml(otp),
-    });
-    const previewUrl = nodemailer.getTestMessageUrl(info);
-    if (previewUrl) console.log("[email] Preview URL:", previewUrl);
-}
-
-// ---------- Public API ----------
-
-// Prefer the Brevo HTTP API when a key is present (required on Render);
-// otherwise fall back to SMTP for local development.
-async function sendOTPEmail(email, otp) {
-    if (process.env.BREVO_API_KEY) {
-        return sendViaBrevo(email, otp);
-    }
-    return sendViaSmtp(email, otp);
 }
 
 module.exports = { sendOTPEmail };
