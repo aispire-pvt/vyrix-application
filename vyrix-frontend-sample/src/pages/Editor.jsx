@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import api from '../api/axios'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
 import SaveIndicator from '../components/editor/SaveIndicator'
 import TipTapEditor from '../components/editor/TipTapEditor'
 import EditorToolbar from '../components/editor/EditorToolbar'
+import AiChatPanel from '../components/editor/AiChatPanel'
 
 export default function Editor() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const projectId = searchParams.get('projectId')
 
   const [user, setUser] = useState(null)
   const [doc, setDoc] = useState(null)
@@ -18,6 +21,7 @@ export default function Editor() {
   const [loading, setLoading] = useState(true)
   const [isTodoOpen, setIsTodoOpen] = useState(false)
   const [editorInstance, setEditorInstance] = useState(null)
+  const [aiOpen, setAiOpen] = useState(false)
   const saveTimerRef = useRef(null)
 
   // Load user + doc in parallel
@@ -108,43 +112,57 @@ export default function Editor() {
         />
 
         {/* Editor content area */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Editor formatting toolbar */}
-          <EditorToolbar editor={editorInstance} />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* Editor formatting toolbar — full width, above the content + AI panel */}
+          <EditorToolbar
+            editor={editorInstance}
+            onAI={() => setAiOpen((v) => !v)}
+            aiActive={aiOpen}
+          />
 
-          {/* Document area — centered, max-width for readability */}
-          <div className="mx-auto w-full max-w-[720px] px-6 pb-32 pt-12">
-            {/* Back link */}
-            <button
-              onClick={() => navigate('/home')}
-              className="mb-8 flex cursor-pointer items-center gap-2 text-[13px] text-[#8d8d97] transition-colors hover:text-white"
-            >
-              ← Back to Home
-            </button>
+          {/* Row: document (left) + AI chat panel (right) */}
+          <div className="flex flex-1 overflow-hidden">
+            <div className="dark-scroll flex-1 overflow-y-auto">
+              {/* Document area — centered, max-width for readability */}
+              <div className="mx-auto w-full max-w-[720px] px-6 pb-32 pt-12">
+                {/* Back link */}
+                <button
+                  onClick={() =>
+                    navigate(projectId ? `/project/${projectId}?source=home` : '/home')
+                  }
+                  className="mb-8 flex cursor-pointer items-center gap-2 text-[13px] text-[#8d8d97] transition-colors hover:text-white"
+                >
+                  ← {projectId ? 'Back to Project' : 'Back to Home'}
+                </button>
 
-            {/* Save indicator */}
-            <div className="mb-4 flex justify-end">
-              <SaveIndicator status={saveStatus} />
+                {/* Save indicator */}
+                <div className="mb-4 flex justify-end">
+                  <SaveIndicator status={saveStatus} />
+                </div>
+
+                {/* Editable title */}
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onBlur={(e) => saveTitle(e.target.value)}
+                  onKeyDown={handleTitleKeyDown}
+                  placeholder="Untitled"
+                  maxLength={100}
+                  className="mb-8 w-full border-none bg-transparent font-unbounded text-[32px] font-medium text-white outline-none placeholder:text-[#4a4a5a]"
+                />
+
+                {/* TipTap rich text editor */}
+                <TipTapEditor
+                  content={doc?.content}
+                  onChange={handleContentChange}
+                  onEditorReady={(ed) => setEditorInstance(ed)}
+                />
+              </div>
             </div>
 
-            {/* Editable title */}
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={(e) => saveTitle(e.target.value)}
-              onKeyDown={handleTitleKeyDown}
-              placeholder="Untitled"
-              maxLength={100}
-              className="mb-8 w-full border-none bg-transparent font-unbounded text-[32px] font-medium text-white outline-none placeholder:text-[#4a4a5a]"
-            />
-
-            {/* TipTap rich text editor */}
-            <TipTapEditor
-              content={doc?.content}
-              onChange={handleContentChange}
-              onEditorReady={(ed) => setEditorInstance(ed)}
-            />
+            {/* AI chat panel — opens from the toolbar AI button */}
+            {aiOpen && <AiChatPanel onClose={() => setAiOpen(false)} />}
           </div>
         </div>
       </div>

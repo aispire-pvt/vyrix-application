@@ -62,9 +62,12 @@ export default function Folder() {
     try {
       const { data: docData } = await api.post('/api/docs')
       await api.patch(`/api/docs/${docData.doc._id}/move`, { folderId: id })
-      navigate(`/doc/${docData.doc._id}`)
+      // Open the new project's overview, not the editor.
+      navigate(
+        `/project/${docData.doc._id}?source=folder&folderName=${encodeURIComponent(folder?.name || '')}`
+      )
     } catch (err) {
-      console.error('Failed to create doc in folder:', err)
+      console.error('Failed to create project in folder:', err)
     }
   }
 
@@ -218,7 +221,11 @@ export default function Folder() {
                 coverIndex={doc.coverIndex}
                 timestamp={relativeTime(doc.updatedAt)}
                 size="small"
-                onClick={() => navigate(`/doc/${doc._id}`)}
+                onClick={() =>
+                  navigate(
+                    `/project/${doc._id}?source=folder&folderName=${encodeURIComponent(folder?.name || '')}`
+                  )
+                }
                 onMoveClick={() =>
                   setMovingDoc({ id: doc._id, title: doc.title, currentFolder: folder })
                 }

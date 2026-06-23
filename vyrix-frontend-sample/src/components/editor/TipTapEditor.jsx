@@ -3,6 +3,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Typography from '@tiptap/extension-typography'
 import CharacterCount from '@tiptap/extension-character-count'
+import { TextStyle, FontSize } from '@tiptap/extension-text-style'
 import { useEffect } from 'react'
 
 // Props: { content, onChange, onEditorReady }
@@ -14,12 +15,24 @@ export default function TipTapEditor({ content, onChange, onEditorReady }) {
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        link: {
+          openOnClick: true,
+          autolink: true,
+          defaultProtocol: 'https',
+          HTMLAttributes: {
+            target: '_blank',
+            rel: 'noopener noreferrer nofollow',
+            class: 'tiptap-link',
+          },
+        },
       }),
       Placeholder.configure({
         placeholder: 'Start writing your research...',
       }),
       Typography,
       CharacterCount,
+      TextStyle,
+      FontSize,
     ],
     content: content || '',
     editorProps: {

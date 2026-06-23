@@ -69,4 +69,49 @@ async function sendOTPEmail(email, otp) {
     console.log("[email] Sent via Brevo API to", email);
 }
 
-module.exports = { sendOTPEmail };
+// Email a user's suggestion / bug report to the Vyrix team inbox.
+async function sendFeedbackEmail({ type, message, userEmail, userName }) {
+    const to = process.env.FEEDBACK_EMAIL || SENDER_EMAIL;
+    const label = type === "bug" ? "Bug report" : "Suggestion";
+    const subject = `Vyrix ${label} from ${userName || userEmail || "a user"}`;
+    const safe = String(message || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = `
+      <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;">
+        <h2 style="margin:0 0 12px;">${label}</h2>
+        <p style="margin:0 0 4px;"><strong>From:</strong> ${userName || "—"} (${userEmail || "unknown"})</p>
+        <p style="margin:0 0 16px;"><strong>Type:</strong> ${label}</p>
+        <div style="white-space:pre-wrap;padding:14px;background:#f4f4f6;border-radius:8px;">${safe}</div>
+      </div>`;
+    const text = `${label}\nFrom: ${userName || "—"} (${userEmail || "unknown"})\n\n${message || ""}`;
+
+    // Dev fallback: log instead of failing when no Brevo key is configured.
+    if (!process.env.BREVO_API_KEY) {
+        console.log(`[feedback] (dev) ${label} from ${userEmail}:\n${message}`);
+        return;
+    }
+
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+            "api-key": process.env.BREVO_API_KEY,
+            "Content-Type": "application/json",
+            accept: "application/json",
+        },
+        body: JSON.stringify({
+            sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+            to: [{ email: to }],
+            replyTo: userEmail ? { email: userEmail, name: userName || userEmail } : undefined,
+            subject,
+            htmlContent: html,
+            textContent: text,
+        }),
+    });
+
+    if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(`Brevo feedback send failed (${res.status}): ${detail}`);
+    }
+    console.log("[feedback] Sent to", to);
+}
+
+module.exports = { sendOTPEmail, sendFeedbackEmail };

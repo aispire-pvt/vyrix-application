@@ -1874,6 +1874,763 @@ import AllFiles from "./pages/AllFiles";
 
 ---
 
+---
+
+# Phase 8: Project Page — Overview, Documents, Flow Repository
+
+## Figma References
+
+| Screen | Node | Description |
+|--------|------|-------------|
+| Empty Project (from All Files) | `298:2477` | Project page, no docs, no description yet |
+| Empty Project (from Home) | `298:2929` | Same but breadcrumb says `Home > ProjectName` |
+| Project with files | `131:588` | Project page with docs, Flow Repository panel filled |
+| Flow Repository (full view) | `298:3132` | Flow view with nodes + Show in Flow toggle + Edit Flow |
+| Flow > Uploaded Files | `298:3401` | Inside a specific flow, showing uploaded files |
+
+Screenshots:
+- Empty (All Files): `https://www.figma.com/api/mcp/asset/812dd10e-98e6-45c6-862b-e1cc899beb7d`
+- Empty (Home): `https://www.figma.com/api/mcp/asset/877cd857-7668-48f4-a1f1-fb121e8491fe`
+- With files: `https://www.figma.com/api/mcp/asset/6ecdbab6-7d6f-4e55-b927-24dd8c295b12`
+- Flow Repository: `https://www.figma.com/api/mcp/asset/34a792fe-dbd8-41a3-8010-62835a0110d6`
+- Uploaded Files in Flow: `https://www.figma.com/api/mcp/asset/cd8c4236-ac76-48dc-993a-486679e0a4de`
+
+---
+
+## Overview — What changes in this phase
+
+Currently clicking a document card from Home or All Files opens the **TipTap editor** (`/doc/:id`) directly. This phase **replaces that behaviour**. Instead, clicking a document card opens a **Project page** (`/project/:id`) that has:
+
+1. **Project header** — editable title (inline, large), cover image icon, breadcrumb that knows where you came from (Home or All Files)
+2. **Description** — editable multi-line text, saved on blur
+3. **Documents tab** — the TipTap editor is accessed from here via a **"Create Document"** button. Other attached files (PDFs, links, Canva, Figma) are also listed here. Sort by control.
+4. **Flow Repository panel** (top-right) — initially empty. Has a "Show in Flow" toggle and "Edit Flow" button. When you add flows and files, they appear here as connected nodes.
+
+The TipTap editor still exists at `/doc/:id` and is opened from inside the Project page, not directly from home.
+
+---
+
+## New Route
+
+```
+/project/:id     ← Project overview page (this phase)
+/doc/:id         ← TipTap editor (already exists — keep as is)
+```
+
+`App.jsx` update:
+```jsx
+import Project from "./pages/Project";
+<Route path="/project/:id" element={<Project />} />
+```
+
+---
+
+## Navigation change — clicking doc cards
+
+**Before:** `onClick={() => navigate('/doc/${doc._id}')}`
+**After:** `onClick={() => navigate('/project/${doc._id}')}`
+
+Update this in:
+- `Home.jsx` (GreetingHeader doc cards + Recent Files row)
+- `AllFiles.jsx` (All Projects grid)
+- `Folder.jsx` (folder docs grid)
+
+The Project page itself has a "Create Document" button that opens `/doc/:id`.
+
+---
+
+## Breadcrumb logic
+
+The breadcrumb must reflect where the user came from:
+- From Home → `Home > ProjectTitle`
+- From All Files → `All files > ProjectTitle`
+- From a Folder → `FolderName > ProjectTitle`
+
+Pass `source` as a URL query param when navigating:
+```js
+// From Home:
+navigate(`/project/${doc._id}?source=home`)
+// From All Files:
+navigate(`/project/${doc._id}?source=allfiles`)
+// From Folder:
+navigate(`/project/${doc._id}?source=folder&folderName=August`)
+```
+
+In `Project.jsx`, read with `useSearchParams()`:
+```js
+const [searchParams] = useSearchParams();
+const source = searchParams.get("source") || "home";
+const folderName = searchParams.get("folderName") || "";
+```
+
+Breadcrumb render:
+```jsx
+// source === "home"     → "Home > {title}"    (Home is a link → /home)
+// source === "allfiles" → "All files > {title}" (All files → /all-files)
+// source === "folder"   → "{folderName} > {title}" (folder name → navigate back)
+```
+
+---
+
+## Backend — Phase 8 Changes
+
+### Update Document Model
+**File:** `src/models/document.model.js`
+
+Add new fields:
+```js
+description: { type: String, default: "" },
+attachments:  { type: Array, default: [] },
+// Each attachment: { id, type, name, url, createdAt }
+// type: 'document' | 'pdf' | 'link' | 'canva' | 'figma'
+
+flows: { type: Array, default: [] },
+// Each flow: { id, name, files: [{ id, name, type, url }] }
+// flows are ordered — position matters for drag/swap
+```
+
+### Update Document Controller
+**File:** `src/controllers/document.controller.js`
+
+Add endpoints:
+
+```js
+// PATCH /api/docs/:id/description
+//   body: { description }
+//   Saves the project description
+//   Returns: { doc: { _id, description } }
+
+// POST /api/docs/:id/attachments
+//   body: multipart — file OR { type: 'link'|'canva'|'figma', name, url }
+//   For file uploads: store name, type from mimetype, generate URL (use ImageKit or just save locally)
+//   For links: store as { type: 'link', name, url }
+//   Appends to doc.attachments array
+//   Returns: { attachment }
+
+// DELETE /api/docs/:id/attachments/:attachmentId
+//   Removes from doc.attachments
+//   Returns: { message }
+
+// POST /api/docs/:id/flows
+//   body: { name }
+//   Creates a new flow with that name, appends to doc.flows
+//   Returns: { flow: { id, name, files: [] } }
+
+// POST /api/docs/:id/flows/:flowId/files
+//   body: multipart OR { type: 'link'|'canva'|'figma', name, url }
+//   Adds a file to the specific flow
+//   Returns: { file }
+
+// DELETE /api/docs/:id/flows/:flowId
+//   Removes a flow
+//   Returns: { message }
+
+// PATCH /api/docs/:id/flows/reorder
+//   body: { flowIds: [id1, id2, id3] } — ordered list
+//   Reorders doc.flows to match the provided order
+//   Returns: { flows }
+```
+
+Add routes in `document.routes.js`:
+```js
+router.patch("/:id/description",                  docController.updateDescription);
+router.post("/:id/attachments",                   upload.single("file"), docController.addAttachment);
+router.delete("/:id/attachments/:attachmentId",   docController.removeAttachment);
+router.post("/:id/flows",                         docController.createFlow);
+router.post("/:id/flows/:flowId/files",           upload.single("file"), docController.addFileToFlow);
+router.delete("/:id/flows/:flowId",               docController.removeFlow);
+router.patch("/:id/flows/reorder",                docController.reorderFlows);
+```
+
+For file uploads, use `multer` with memory storage (store to a temp buffer). Since ImageKit is already configured, upload via the existing `storage.service.js`. If ImageKit is not ready, just save file metadata without an actual URL for now.
+
+---
+
+## Frontend — Project Page
+
+### `src/pages/Project.jsx`
+
+**Layout:** Same Sidebar + Navbar shell. `activePage` comes from `source`.
+
+**Content area structure (left ~60%, right ~40%):**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Sidebar    │   [Navbar tabs]                                    │
+│             ├────────────────────────────────────────────────────│
+│             │  All files > Untitled 1          (breadcrumb)      │
+│             │  [cover icon]  Untitled 1        (title input)     │
+│             │  ─────────────────────────────────────────────     │
+│             │  Description                     (label)           │
+│             │  Enter Description...            (textarea)        │
+│             │  ─────────────────────────────────────────────     │
+│             │  Documents                       (section label)   │
+│             │  Sort By [Date Created ▾]        (sort pill)      │
+│             │  [file cards grid]               (attachments)     │
+│             │  [Add files button]                                 │
+│             │  ─── right side ───                                │
+│             │  [Flow Repository panel]         (top-right)       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Full data fetch on mount:**
+```js
+Promise.all([
+  api.get("/api/auth/me"),
+  api.get(`/api/docs/${id}`),   // returns title, description, attachments, flows, coverIndex
+])
+```
+
+---
+
+## Project Page Layout — Detailed
+
+### Top section (above the first divider, y=58–352)
+
+**Left side (x=388–1047, i.e. ~60% width):**
+
+- **Breadcrumb** — `y=102`: `"Home > Untitled 1"` or `"All files > August"`
+  - `text-[16px] text-[#d5d5d5] font-[590]`
+  - First part is a clickable link back to source
+  - `" > "` separator in `#8d8d97`
+  - Project title is current (non-link) — updates in real time as user types title
+
+- **Cover icon** + **Title** — side by side at `y=140`:
+  - Cover icon: `w-[62px] h-[62px] rounded-[11px]` — use `getCoverImage(doc.coverIndex)` — `object-cover`
+  - Title `<input>`: `font-['Unbounded'] font-medium text-[38px] text-white bg-transparent border-none outline-none placeholder-[#4a4a5a]` — `placeholder="Untitled"`
+  - On blur or Enter → `PATCH /api/docs/:id { title }`
+  - `SaveIndicator` shows save status (reuse from Editor)
+
+**Right side (x=1195–1920):**
+
+- **Flow Repository panel** — `x=1195, y=58, w=725, h=293`
+  - `bg-[rgba(12,12,24,0.11)] rounded-[20px] shadow-[1px_4px_7.7px_5px_rgba(0,0,0,0.25)]`
+  - `"Flow Repository"` heading — `SF Pro Bold, 32px, #d5d5d5`
+  - When `doc.flows.length === 0`: empty state — just heading + "No flows yet" subtext
+  - When flows exist: "Recently Uploaded" label + file icons (from flow files)
+  - Always shows `box1` icon top-right
+  - This panel updates as flows/files are added below
+
+---
+
+### Second section (below first divider, y=352–end)
+
+- **Description section** (y=219–352):
+  - `"Description"` label — `14px, #d5d5d5, font-bold` at `y=219`
+  - Description `<textarea>`: `w-[659px] min-h-[72px] bg-transparent border-none outline-none resize-none text-[15px] text-[#d5d5d5] placeholder-[#4a4a5a] leading-[1.6]`
+  - `placeholder="Enter Description..."`
+  - On blur → `PATCH /api/docs/:id/description { description }`
+  - Auto-grows with content
+
+- **Second divider** at `y=352` — `w-full h-[1px] bg-[rgba(255,255,255,0.06)]`
+
+- **Documents section** (y=384+):
+  - `"Documents"` label — `Unbounded-like, 20px, #d5d5d5, font-[590]` at `y=384`
+  - `"Sort By"` pill same as All Files page
+  - **File cards grid** — `flex flex-wrap gap-[18px]` starting at ~`y=443`
+    - Each uploaded file/attachment as a `DocumentCard` with `size="small"`
+    - File type cards (PDFs, links, Canva, Figma) shown as cards with cover images or type-specific icons
+    - Clicking a "Create Document" type attachment → `navigate('/doc/${attachment.docId}')`
+  - **"Add files" button** — bottom-right area:
+    - `w-[108px] h-[39px]` button with `+` icon + `"Add files"` text
+    - Clicking opens an **"Add File" dropdown menu** (see below)
+  - **Empty state** when no attachments:
+    - `"No Documents yet.."` centered text in `#d5d5d5, 16px`
+
+---
+
+## "Add Files" Dropdown Menu
+
+From Figma `298:2929` — clicking "Add files" shows a popup menu:
+
+```
+┌─────────────────────────────┐
+│  Create Document File       │   ← opens /doc/:id (creates TipTap doc, adds as attachment)
+├─────────────────────────────┤
+│  Make a file on Canva  [↗]  │   ← opens canva.com in new tab (placeholder)
+├─────────────────────────────┤
+│  Make a file on Figma  [↗]  │   ← opens figma.com in new tab (placeholder)
+├─────────────────────────────┤
+│  Add a link                 │   ← shows inline URL input
+├─────────────────────────────┤
+│  Add a file                 │   ← opens file picker (PDF, Word, etc.)
+└─────────────────────────────┘
+```
+
+**Design:** `bg-[#1a1a2e] border border-[rgba(150,150,165,0.3)] rounded-[13px] w-[284px] shadow-xl`
+Each row: `px-5 py-3 text-[16px] text-white hover:bg-[rgba(255,255,255,0.06)] cursor-pointer`
+Dividers between rows: `h-[1px] bg-[rgba(255,255,255,0.08)]`
+External link icons (Canva/Figma rows): small `[↗]` icon, `opacity-60`
+
+**"Create Document File" action:**
+```js
+// Creates a new TipTap doc, attaches it to this project, navigates to editor
+const { data } = await api.post("/api/docs");
+await api.post(`/api/docs/${projectId}/attachments`, {
+  type: "document",
+  name: "Untitled",
+  url: `/doc/${data.doc._id}`,
+  docId: data.doc._id,
+});
+navigate(`/doc/${data.doc._id}?projectId=${projectId}`);
+// projectId in query param lets editor show "Back to Project" instead of "Back to Home"
+```
+
+**"Add a link" action:**
+- Inline: shows a small input below the button: `placeholder="https://..."`
+- On Enter: `POST /api/docs/:id/attachments { type: 'link', name: url, url }`
+
+**"Add a file" action:**
+- Opens `<input type="file" accept=".pdf,.doc,.docx,.txt,.ppt,.pptx">`
+- On select: `POST /api/docs/:id/attachments` as multipart
+- Shows file name + type icon as a card
+
+**"Canva" / "Figma" actions:**
+- Opens `https://www.canva.com` or `https://www.figma.com` in a new tab
+- Shows "In Development" toast for now
+
+---
+
+## Flow Repository Section
+
+The Flow Repository panel is in the **top-right** of the Project page. It is **separate** from the Documents section.
+
+### Empty state (no flows)
+- Just the heading + "No flows yet" subtext
+- An **"Add flow"** button: `w-[108px] h-[39px] bg-transparent border border-[rgba(178,197,242,0.3)] rounded-[9px] text-[#b2c5f2] text-[13px]` with `+` icon + `"Add flow"` text
+
+### When flows exist — from Figma `131:588` and `298:3132`
+
+The Flow Repository panel fills with:
+- `"Recently Uploaded"` label + underline (from the most recently uploaded files across all flows)
+- File icons (pdf, photo, link) — same style as Repository Files in All Files page
+- `box1` icon (top-right corner of panel)
+
+The content area **below** the panel also changes when flows exist:
+- `"Show in Flow"` toggle — pill button `bg-[rgba(12,12,24,0.8)] border border-[#a6a6a6] rounded-[15px]` with a checkbox inside:
+  - When **ON**: shows the connected flow diagram view (nodes connected by lines)
+  - When **OFF**: shows the regular flat grid of document cards
+- `"Edit Flow"` button — only visible when "Show in Flow" is ON — `bg-transparent border border-[rgba(178,197,242,0.3)] rounded-[9px] px-4 py-1 text-[14px] text-white`
+  - When **Edit Flow is active**: flow nodes become draggable — user can swap their order
+  - When clicked again: exits edit mode and saves the new order via `PATCH /api/docs/:id/flows/reorder`
+
+### Flow diagram view (Show in Flow = ON)
+
+From Figma `298:3132`:
+- Full-width scrollable area `bg-[#1a1a2e] rounded-[20px] border border-[rgba(178,197,242,0.08)]`
+- `"Flow Repository"` heading + folder icon + description text inside
+- Each **flow** = a named box with connected doc card nodes under it
+- Flow names are shown as labels above their nodes: "Pre Research", "Interview and surveys", "Research Materials", "Research Papers"
+- Nodes are connected by lines (CSS borders, not SVG) showing hierarchy
+- At the bottom of the flow area: scrollbar
+- `"Add to Flow"` button: `w-[108px] h-[39px]` with `+` icon — creates a new flow via `POST /api/docs/:id/flows { name: "New Flow" }`
+
+### Clicking a flow node → navigates to `/project/:id/flow/:flowId`
+
+This is the "Uploaded Files" view from Figma `298:3401`:
+- Breadcrumb: `"Flow Repository > Pre Research"`
+- Flow name heading: `"Pre Research"` (Unbounded, large)
+- Grid of uploaded files in this flow (pdf/photo/link cards same as documents)
+- `"Add Files"` button → simplified dropdown:
+  ```
+  ┌──────────────────────────┐
+  │  Add file from Computer  │
+  ├──────────────────────────┤
+  │  Add a link           [↗]│
+  └──────────────────────────┘
+  ```
+- Scrollbar at bottom
+
+---
+
+## New Files
+
+```
+src/
+├── pages/
+│   └── Project.jsx                     ← /project/:id
+├── components/
+│   └── project/
+│       ├── FlowRepository.jsx          ← top-right panel
+│       ├── FlowDiagram.jsx             ← connected nodes view (Show in Flow = ON)
+│       ├── FlowNode.jsx                ← individual draggable flow node
+│       ├── AddFilesMenu.jsx            ← dropdown menu for adding files
+│       └── AttachmentCard.jsx          ← single file card (pdf/link/canva/figma/doc)
+├── pages/
+│   └── FlowView.jsx                    ← /project/:id/flow/:flowId (uploaded files in a flow)
+```
+
+---
+
+## Updated Editor.jsx
+
+When editor is opened from a project (via `?projectId=...` query param):
+- `← Back` link changes from `"Back to Home"` to `"Back to Project"` → `navigate('/project/${projectId}')`
+
+```js
+const [searchParams] = useSearchParams();
+const projectId = searchParams.get("projectId");
+// ...
+<button onClick={() => navigate(projectId ? `/project/${projectId}` : "/home")}>
+  ← {projectId ? "Back to Project" : "Back to Home"}
+</button>
+```
+
+---
+
+## Build Plan — Level by Level
+
+### Level 1 — Backend: new doc fields + description + attachment endpoints
+Add `description`, `attachments`, `flows` to Document model. Add `updateDescription` and `addAttachment`/`removeAttachment` controllers + routes. Test with REST client.
+
+**Check:** `PATCH /api/docs/:id/description` saves description. `POST /api/docs/:id/attachments` with `{ type: 'link', name: 'test', url: 'https://example.com' }` adds to attachments array.
+
+### Level 2 — Navigation change + Project page shell
+- Change all doc card `onClick` in Home, AllFiles, Folder to navigate to `/project/:id` with correct `?source=` param
+- Create `Project.jsx` shell with Sidebar + Navbar + data fetch
+- Editable title (same pattern as Editor.jsx) with breadcrumb
+- Flow Repository panel as placeholder (just the dark card with heading)
+- No description or docs section yet
+
+**Check:** Clicking a doc card from Home/AllFiles opens `/project/:id`. Breadcrumb says `Home > DocTitle` or `All files > DocTitle`. Title is editable and saves.
+
+### Level 3 — Description + Documents section + Sort
+- Add editable description textarea (auto-saves on blur)
+- Documents section label + Sort By pill
+- Render `doc.attachments` as a grid of `AttachmentCard` components
+- Empty state when no attachments
+- "Add files" button (no dropdown yet — just a placeholder)
+
+**Check:** Description saves on blur. Empty state shows. Sort pill renders.
+
+### Level 4 — "Add files" dropdown + file/link attachment
+- Build `AddFilesMenu.jsx` dropdown
+- Wire "Create Document File" → creates a new doc, adds attachment, navigates to editor
+- Wire "Add a link" → inline URL input → saves attachment
+- Wire "Add a file" → file picker → `POST /api/docs/:id/attachments` multipart
+- Canva/Figma → open external link in new tab + "In Development" toast
+- `AttachmentCard.jsx` renders each attachment type with appropriate icon
+
+**Check:** All 5 menu options work. Files/links appear as cards. "Create Document File" navigates to editor and shows "Back to Project" on return.
+
+### Level 5 — Flow Repository backend + empty/filled panel
+- Add `createFlow`, `addFileToFlow`, `removeFlow`, `reorderFlows` to backend
+- Build `FlowRepository.jsx` panel:
+  - Empty state with "Add flow" button
+  - When flows exist: "Recently Uploaded" files from all flows
+- "Add flow" creates a flow via `POST /api/docs/:id/flows`
+- Panel shows flow names in a simple list
+
+**Check:** Create a flow, see it appear in the panel.
+
+### Level 6 — Flow diagram + Show in Flow toggle + Edit Flow
+- Build `FlowDiagram.jsx` — connected nodes view
+- "Show in Flow" toggle shows/hides the diagram vs flat grid
+- "Edit Flow" button enables drag-to-swap on flow nodes
+- `FlowNode.jsx` — draggable when in edit mode, uses `onDragStart`/`onDrop` for swap
+- On "Edit Flow" click again → save reorder via `PATCH /api/docs/:id/flows/reorder`
+
+**Check:** Toggle works. Flow nodes render with names. Drag-swap reorders flows.
+
+### Level 7 — Flow view page (`/project/:id/flow/:flowId`)
+- New route `/project/:id/flow/:flowId` → `FlowView.jsx`
+- Clicking a flow node navigates to this page
+- Shows breadcrumb `"Flow Repository > FlowName"`
+- Grid of files in that flow
+- "Add Files" simplified dropdown (file + link only)
+- "Add to Flow" button wired to flow-specific upload
+
+**Check:** Click a flow node, enter flow view, add a file, it appears in the flow.
+
+### Level 8 — Polish
+- Breadcrumb "Back" arrow on project page and flow view
+- `SaveIndicator` on title and description
+- Attachment card hover actions (delete attachment)
+- Flow Repository panel "Recently Uploaded" shows real files from flows
+- Editor's `← Back` link correctly points to project when opened from project
+
+---
+
+## Notes for Claude Code
+
+1. **The TipTap editor (`/doc/:id`) still exists** — it's just no longer opened directly from Home/AllFiles. It's opened from inside the Project page.
+2. **`/project/:id` and `/doc/:id` are different** — the project page is the overview; the doc page is the writing surface.
+3. **`source` query param** — always pass it when navigating to `/project/:id` so the breadcrumb is correct.
+4. **Flows are stored inside the document** as an embedded array — no separate Mongoose model needed.
+5. **File uploads** — use `multer` on the backend. For now, if ImageKit isn't wired up, just store the original filename and mime type. A real URL is not required for MVP.
+6. **Flow drag-swap** — use plain HTML5 drag-and-drop (`draggable`, `onDragStart`, `onDragOver`, `onDrop`). No library needed. Only works when `isEditMode` is true.
+7. **"In Development" toast** — reuse the same arriving-soon toast pattern already in Sidebar.jsx.
+8. **Build level by level** — stop after each level and report. Do not do multiple levels in one go.
+9. **Do not break** the existing Editor, Home, AllFiles, Folder, or onboarding flows.
+
+---
+
+---
+
+# Phase 9: AI Page
+
+## Figma Reference
+- AI Page: `https://www.figma.com/design/Y8LjNhIWs64XrGFcR9eSnV/Vyrix-UI-Design?node-id=288-1399`
+- Screenshot: `https://www.figma.com/api/mcp/asset/a52be3d3-c564-4dc2-9012-1bffd878da72`
+
+## Overview
+
+When the user clicks **"AI"** in the sidebar, it opens a new **tab** in the Navbar (labelled "AI") and navigates to `/ai`. The AI page is a research assistant chat interface — same Sidebar + Navbar shell as all other pages, but the content area is a full-height chat UI.
+
+The page has:
+1. **Gradient background** — same dark blue-purple gradient as the Home page (GRADIENT 1 from Figma — do NOT skip this, it's what makes the page look premium)
+2. **Centered greeting** — `"Hi {firstName}! Lets get Started"` in Unbounded 40px centered in the viewport
+3. **Suggestion pills** — 3 clickable prompt suggestions, each in its own bordered row, separated by horizontal lines
+4. **Chat input bar** at the bottom — full width, white border, rounded corners, with a paperclip icon (left), a vertical divider line, `"Ask anything"` placeholder text, and a circular send button (right)
+5. The chat messages area is empty on first load — just the greeting + suggestions are shown
+
+---
+
+## Layout Breakdown (1920×1080)
+
+### Background layers
+- Outer card: `bg-black rounded-[22px]` `x=29, y=27, w=1862, h=1027`
+- Base: `bg-[rgba(0,0,0,0.2)]` full screen overlay
+- **GRADIENT 1** (`x=339, y=35, w=1540, h=766`) — the signature dark blue-purple gradient:
+  - Vector 1: large gradient blob, `opacity-92`, `h=385px` — asset `imgVector15`
+  - Vector 4: second gradient blob, `opacity-92`, `h=205px` — asset `imgVector16`
+  - Rectangle 2: `bg-size-[1024px_1024px] mix-blend-overlay opacity-92 rounded-[15px]` — asset `imgRectangle2`
+  - Vector 5: bottom gradient, `opacity-92`, `h=285px` — asset `imgVector17`
+
+  **In React, implement the gradient as:**
+  ```jsx
+  {/* GRADIENT 1 — identical to Home page gradient */}
+  <div className="absolute left-[339px] top-[35px] w-[1540px] h-[766px] pointer-events-none">
+    <div className="absolute" style={{ left: 0, top: 0, width: '100%', height: '385px', opacity: 0.92 }}>
+      <img src={imgVector15} alt="" className="absolute block max-w-none w-full h-full" style={{ inset: '-77.92% -19.48%' }} />
+    </div>
+    <div className="absolute" style={{ left: '314px', top: '207px', width: '875px', height: '205px', opacity: 0.92 }}>
+      <img src={imgVector16} alt="" className="absolute block max-w-none w-full h-full" style={{ inset: '-145.97% -34.29%' }} />
+    </div>
+    <div
+      className="absolute rounded-[15px] mix-blend-overlay opacity-[0.92]"
+      style={{ left: '4px', top: 0, width: '1536px', height: '766px', backgroundImage: `url("${imgRectangle2}")`, backgroundSize: '1024px 1024px', backgroundPosition: 'top left' }}
+    />
+    <div className="absolute" style={{ left: '4px', top: '224px', width: '1536px', height: '285px', opacity: 0.92 }}>
+      <img src={imgVector17} alt="" className="absolute block max-w-none w-full h-full" style={{ inset: '-105.26% -19.53%' }} />
+    </div>
+  </div>
+  ```
+
+### Greeting text (centered in content area)
+- Position: centered horizontally, `y=294` from top of frame (roughly vertical center-ish)
+- Line 1: `"Hi {firstName}!"` — `font-['Unbounded'] font-medium text-[40px] text-[#e7e7e7] text-center`
+- Line 2: `"Lets get Started"` — same style
+- Both lines in one element, leading-tight
+
+### Suggestion pills (y=775–988)
+Two bordered sections:
+
+**Top section** (`y=775, h=144`) — top border + left/right borders, `rounded-tl-[16px] rounded-tr-[16px]`:
+- `border-t border-l border-r border-white opacity-60`
+- Contains 2 suggestion rows separated by a horizontal line at `y=829` and `y=869`:
+  - Row 1 (y=801): `"Lets find a new research paper today !"` — `text-[13px] text-[#adadad] font-normal`
+  - Row 2 (y=841): `"Hello Ai! Lets start with a fresh topic"` — same style
+
+**Bottom section** (`y=919, h=69`) — bottom border only, `rounded-bl-[16px] rounded-br-[16px]`:
+- `border border-white opacity-60` (all sides but primarily bottom feel)
+- Contains 1 suggestion row (y=877): `"Lets review our ongoing projects"` — same style
+
+The full suggestions container spans `x=358, w=1513px`.
+
+Each suggestion row is clickable — clicking it populates the chat input.
+
+### Chat input bar (y=919–988)
+- Full width: `x=358, w=1513px, h=69px`
+- Container: `border border-white opacity-60 rounded-bl-[16px] rounded-br-[16px]` — this is the bottom section from above that also serves as the input container
+- **Left side:**
+  - Paperclip icon: `x=394, y=937, w=28, h=28` — asset `imgPaperclip1`
+  - Vertical divider line at `x=462` — thin `w=1px, h=26px` line (`imgLine33`)
+  - `"Ask anything"` placeholder text: `x=469, y=945` — `SF Pro Medium, 14px, #a0a0a0`
+- **Right side:**
+  - Send button: circular `w=45, h=45` at `x=1807, y=931` — `imgEllipse7` background + `imgGroup136` arrow icon inside
+
+### Assets
+
+```js
+// AI Page specific assets
+const imgVector15    = "https://www.figma.com/api/mcp/asset/5e9d9fff-f342-4fc8-9935-fdf30f756d9d"; // gradient blob 1
+const imgVector16    = "https://www.figma.com/api/mcp/asset/681b0a60-697b-4d3c-9217-a6226e8244ac"; // gradient blob 2
+const imgRectangle2  = "https://www.figma.com/api/mcp/asset/6ae41cb1-6ce2-4298-8fb3-4ce6728e76da"; // gradient overlay texture
+const imgVector17    = "https://www.figma.com/api/mcp/asset/4fd2e9bf-07b3-4e7f-a344-aa28bcbee5c1"; // gradient blob 3
+const imgPaperclip1  = "https://www.figma.com/api/mcp/asset/32ca8cdd-c98a-427d-8fe2-4a010d8b1ff6"; // paperclip icon
+const imgEllipse7    = "https://www.figma.com/api/mcp/asset/48ac5656-8188-4153-b6e4-5a9d0a9b6fe0"; // send button bg circle
+const imgGroup136    = "https://www.figma.com/api/mcp/asset/b3ff8f6f-a763-4c0c-ab15-3ccead31d3ef"; // send arrow icon
+const imgLine33      = "https://www.figma.com/api/mcp/asset/251086dd-45a9-46c5-ba5a-cf5e973d5d93"; // vertical divider
+```
+
+---
+
+## Navbar Tab Behaviour
+
+When "AI" is clicked in the sidebar:
+- A new tab labeled `"AI"` is added to the Navbar tab strip (same style as other tabs — `bg-[#b2c5f2] text-black` when active)
+- Navigate to `/ai`
+- The AI tab should appear and remain in the Navbar while the user is on the AI page
+- Closing the tab (×) navigates back to `/home`
+
+In `Sidebar.jsx`, update the "AI" nav item `onClick`:
+```js
+// Instead of showArrivingSoon():
+onClick: () => navigate("/ai"),
+```
+
+In `Navbar.jsx`, add support for a dynamic `aiTab` prop:
+```jsx
+// Navbar already receives activeTabTitle from pages
+// For the AI page, pass activeTabTitle="AI" to Navbar
+// The active tab will show "AI" instead of a doc title
+```
+
+`activePage` for `AI.jsx` → `"ai"` — update Sidebar to highlight "AI" item when `activePage === "ai"`.
+
+---
+
+## Chat Functionality (UI only — no backend)
+
+The AI page is **UI-only** for now. No actual AI API calls. The input accepts text, and when submitted, a mock response is shown. This is for the investor demo.
+
+### State:
+```js
+const [messages, setMessages]   = useState([]); // { role: 'user'|'ai', text: string }
+const [inputText, setInputText] = useState("");
+const messagesEndRef = useRef(null);
+```
+
+### Message rendering (when messages exist):
+- Replace the greeting + suggestions UI with the chat messages view
+- User messages: right-aligned, `bg-[rgba(178,197,242,0.12)] border border-[rgba(178,197,242,0.2)] rounded-[16px] px-4 py-3 max-w-[60%] text-[15px] text-white`
+- AI messages: left-aligned, `bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-[16px] px-4 py-3 max-w-[70%] text-[15px] text-[#e7e7e7]`
+- Auto-scroll to bottom when new message added
+
+### Mock AI response:
+```js
+const mockResponse = async (userMessage) => {
+  // Simulate thinking delay
+  await new Promise(r => setTimeout(r, 800));
+  const responses = [
+    "That's an interesting research direction. Let me help you explore that further.",
+    "Based on your research context, here are some key areas to investigate...",
+    "I can help you synthesize information on that topic. What specific aspect interests you most?",
+    "Great question for your research. Consider exploring peer-reviewed sources on this.",
+  ];
+  return responses[Math.floor(Math.random() * responses.length)];
+};
+```
+
+### Submit handler:
+```js
+const handleSubmit = async () => {
+  const text = inputText.trim();
+  if (!text) return;
+  setInputText("");
+  setMessages(prev => [...prev, { role: "user", text }]);
+  // Show AI typing indicator
+  setMessages(prev => [...prev, { role: "ai", text: "...", typing: true }]);
+  const response = await mockResponse(text);
+  setMessages(prev => prev.map((m, i) =>
+    i === prev.length - 1 && m.typing ? { role: "ai", text: response } : m
+  ));
+};
+```
+
+### Suggestion click:
+```js
+const handleSuggestion = (text) => {
+  setInputText(text);
+  // Auto focus the input
+};
+```
+
+---
+
+## New Files
+
+```
+src/
+├── pages/
+│   └── AI.jsx              ← /ai
+```
+
+---
+
+## New Route in App.jsx
+
+```jsx
+import AI from "./pages/AI";
+<Route path="/ai" element={<AI />} />
+```
+
+---
+
+## Build Plan — Level by Level
+
+### Level 1 — AI page shell + gradient + greeting
+- Create `AI.jsx` with Sidebar + Navbar shell
+- Add the full GRADIENT 1 background exactly as spec'd above — use asset URLs
+- Centered greeting: `"Hi {firstName}! Lets get Started"` — read firstName from `/api/auth/me`
+- `activePage="ai"` — update Sidebar "AI" item to navigate to `/ai` and highlight when active
+
+**Check:** `/ai` loads, gradient is visible (dark blue-purple tones), greeting shows real firstName.
+
+### Level 2 — Suggestion pills + horizontal line dividers
+- Top bordered section: 2 suggestion rows with lines between them
+- Bottom bordered section: 1 suggestion row (also serves as input container border)
+- Exact border style: `border border-white opacity-60` with correct border-radius per section
+- Suggestion text: `text-[13px] text-[#adadad]`
+- Clicking a suggestion populates the input (wire in Level 3)
+
+**Check:** 3 suggestion pills render with white borders, separated by horizontal lines, correct border-radius.
+
+### Level 3 — Chat input bar
+- Paperclip icon (left): `imgPaperclip1` asset, `28×28px`
+- Vertical divider line: `imgLine33` asset, `1px wide, 26px tall`
+- `"Ask anything"` placeholder: `14px, #a0a0a0, SF Pro Medium`
+- `<input>` or `<textarea>` for typing
+- Send button (right): `imgEllipse7` circle + `imgGroup136` arrow, `45×45px`
+- Pressing Enter or clicking send button calls `handleSubmit`
+- Clicking a suggestion sets `inputText` and focuses the input
+
+**Check:** Input renders correctly, Enter submits, clicking suggestion fills input.
+
+### Level 4 — Chat messages + mock AI response
+- When messages exist: replace greeting+suggestions with scrollable messages view
+- User message: right-aligned blue pill
+- AI message: left-aligned dark pill
+- Typing indicator: `"..."` in AI bubble while waiting
+- Auto-scroll to bottom after each message
+- Input stays at bottom always
+
+**Check:** Send a message, see it appear right-aligned, AI responds after 800ms with a mock answer.
+
+### Level 5 — Polish
+- Navbar tab: when on `/ai`, add an `"AI"` tab to the Navbar tab strip (active, `bg-[#b2c5f2] text-black`)
+- Closing the AI tab (×) navigates to `/home` and removes the tab
+- Sidebar "AI" item is highlighted (`bg-[#b2c5f2] text-black`) when on `/ai`
+- Input bar stays visible even when messages are shown — always at bottom
+- Smooth scroll animation on new messages
+
+**Check:** AI tab appears in Navbar when on `/ai`. Closing the × removes the tab and goes back to home.
+
+---
+
+## Notes for Claude Code
+
+1. **The gradient is mandatory** — use the exact asset URLs provided. The page looks generic without it.
+2. **Suggestion pills use the same bordered box as the chat input** — the bottom section `(y=919)` is both the 3rd suggestion container AND the input bar container. They share the same border box.
+3. **No backend AI integration yet** — mock responses only. The actual AI API (OpenAI/Anthropic) comes in a future phase.
+4. **`firstName` comes from `/api/auth/me`** — same pattern as every other page.
+5. **Navbar tab for AI** — in `Navbar.jsx`, the tab strip currently shows hardcoded document tabs. For the AI page, pass `activeTabTitle="AI"` as a prop and it renders as the active tab.
+6. **Build level by level** — stop after each level and report.
+7. **Do not break** any existing pages.
+
+---
+
 ## Phase 3: Backend Integration + Fixes
 
 ### Overview

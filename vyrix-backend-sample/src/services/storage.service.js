@@ -4,12 +4,12 @@ const client = new ImageKit({
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY
 });
 
-async function uploadImage(file)
+async function uploadImage(file, fileName = 'user.jpg', folder = 'vyrix-users/images')
 {
     const response = await client.files.upload({
         file,
-        fileName: 'user.jpg',
-        folder:"vyrix-users/images"
+        fileName,
+        folder
       });
       return response;
 }

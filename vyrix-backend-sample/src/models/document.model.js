@@ -16,6 +16,17 @@ const documentSchema = new mongoose.Schema(
         },
         // Index into the frontend COVER_IMAGES pool, assigned randomly on create.
         coverIndex: { type: Number, default: 0, min: 0, max: 3 },
+
+        // Project overview description (editable, saved on blur).
+        description: { type: String, default: "" },
+
+        // Attached files/links. Each: { id, type, name, url, createdAt }
+        // type: 'document' | 'pdf' | 'link' | 'canva' | 'figma'
+        attachments: { type: Array, default: [] },
+
+        // Flow repository. Each: { id, name, files: [{ id, name, type, url }] }
+        // Ordered — position matters for drag/swap.
+        flows: { type: Array, default: [] },
     },
     {
         versionKey: false,

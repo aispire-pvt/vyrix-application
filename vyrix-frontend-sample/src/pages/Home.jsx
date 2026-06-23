@@ -56,13 +56,15 @@ export default function Home() {
   const handleCreateDoc = async () => {
     try {
       const { data } = await api.post('/api/docs')
-      navigate(`/doc/${data.doc._id}`)
+      // A new project opens its overview (name/description/documents/flow repo),
+      // not the editor — the editor is for documents created inside the project.
+      navigate(`/project/${data.doc._id}?source=home`)
     } catch (err) {
-      console.error('Failed to create doc:', err)
+      console.error('Failed to create project:', err)
     }
   }
 
-  const openDoc = (id) => navigate(`/doc/${id}`)
+  const openDoc = (id) => navigate(`/project/${id}?source=home`)
 
   if (loading) {
     return (

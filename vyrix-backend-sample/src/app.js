@@ -4,6 +4,8 @@ const authRoutes= require("./routes/auth.routes");
 const onboardingRoutes=require("./routes/onboarding.routes");
 const documentRoutes=require("./routes/document.routes");
 const folderRoutes=require("./routes/folder.routes");
+const feedbackRoutes=require("./routes/feedback.routes");
+const todoRoutes=require("./routes/todo.routes");
 const cookerParser= require("cookie-parser");
 
 const app= express();
@@ -21,5 +23,7 @@ app.use("/api/auth",authRoutes);
 app.use("/api/onboarding",onboardingRoutes);
 app.use("/api/docs",documentRoutes);
 app.use("/api/folders",folderRoutes);
+app.use("/api/feedback",feedbackRoutes);
+app.use("/api/todos",todoRoutes);
 
 module.exports= app;

@@ -121,6 +121,16 @@ async function loginUser(req, res) {
     }
 }
 
+// Clear the auth cookie. Options must match how it was set so the browser drops it.
+async function logoutUser(req, res) {
+    res.clearCookie("token", {
+        httpOnly: true,
+        sameSite: isProd ? "none" : "lax",
+        secure: isProd,
+    });
+    return res.status(200).json({ success: true, message: "Logged out" });
+}
+
 // Sign in / sign up with Google. The frontend sends a Google OAuth access token;
 // we verify it was issued for THIS app and fetch the verified profile from Google.
 async function googleAuth(req, res) {
@@ -223,4 +233,4 @@ async function getMe(req, res) {
     }
 }
 
-module.exports = { registerUser, loginUser, googleAuth, getMe };
+module.exports = { registerUser, loginUser, logoutUser, googleAuth, getMe };

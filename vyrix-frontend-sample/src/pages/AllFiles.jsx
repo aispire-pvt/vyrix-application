@@ -6,6 +6,8 @@ import Navbar from '../components/home/Navbar'
 import ProjectsSection from '../components/home/ProjectsSection'
 import DocumentCard from '../components/home/DocumentCard'
 import MoveModal from '../components/home/MoveModal'
+import TodoPanel from '../components/home/TodoPanel'
+import FileTypeIcon from '../components/project/FileTypeIcon'
 import { relativeTime } from '../utils/relativeTime'
 // GRADIENT 1 — same subtle blue glow used on the Home header (Figma All Files top section)
 import headerGlow from '../assets/home/header-glow.png'
@@ -17,10 +19,7 @@ const SORT_OPTIONS = [
   { key: 'name', label: 'Name (A–Z)' },
 ]
 
-// Repository Files assets (Figma)
-const imgPdf1 = 'https://www.figma.com/api/mcp/asset/b8432742-8173-446b-8635-f7b9972f2945'
-const imgPhoto1 = 'https://www.figma.com/api/mcp/asset/a05f6f2a-cf2d-4f28-85f2-32f29cb367b4'
-const imgLink1 = 'https://www.figma.com/api/mcp/asset/b1cbfe2a-c104-4da9-9684-9e657f4867de'
+// Repository Files panel icon (Figma)
 const imgBox1 = 'https://www.figma.com/api/mcp/asset/92546667-6069-4a1c-b6ab-3af3d9ceb478'
 
 export default function AllFiles() {
@@ -33,15 +32,6 @@ export default function AllFiles() {
   const [sortIndex, setSortIndex] = useState(0) // index into SORT_OPTIONS
   const [isTodoOpen, setIsTodoOpen] = useState(false)
   const [movingDoc, setMovingDoc] = useState(null)
-  const [repoToast, setRepoToast] = useState(false)
-
-  // Auto-hide the repo toast after 2.5s
-  useEffect(() => {
-    if (repoToast) {
-      const t = setTimeout(() => setRepoToast(false), 2500)
-      return () => clearTimeout(t)
-    }
-  }, [repoToast])
 
   useEffect(() => {
     let active = true
@@ -83,12 +73,22 @@ export default function AllFiles() {
 
   const cycleSortOption = () => setSortIndex((i) => (i + 1) % SORT_OPTIONS.length)
 
+  // Most recent files across all projects (attachments + flow files) for the panel.
+  const recentRepoFiles = docs
+    .flatMap((doc) => [
+      ...(doc.attachments || []),
+      ...(doc.flows || []).flatMap((f) => f.files || []),
+    ])
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .slice(0, 3)
+
   const handleCreateDoc = async () => {
     try {
       const { data } = await api.post('/api/docs')
-      navigate(`/doc/${data.doc._id}`)
+      // Open the new project's overview, not the editor.
+      navigate(`/project/${data.doc._id}?source=allfiles`)
     } catch (err) {
-      console.error('Failed to create doc:', err)
+      console.error('Failed to create project:', err)
     }
   }
 
@@ -181,44 +181,28 @@ export default function AllFiles() {
                   <div className="mt-1 h-[1px] w-[131px] bg-[rgba(178,197,242,0.3)]" />
                 </div>
 
-                {/* File icons row */}
+                {/* Recently uploaded files (live) + Open Repo */}
                 <div className="flex items-start gap-8">
-                  {/* PDF file */}
-                  <div className="flex flex-col items-center gap-2">
-                    <img src={imgPdf1} alt="pdf" className="h-[72px] w-[72px] rounded-[8px] object-cover" />
-                    <p className="w-[90px] truncate text-center text-[14px] font-[590] text-white">Research Paper 3</p>
-                    <p className="text-[12px] text-[#d5d5d5]">Pdf</p>
-                  </div>
+                  {recentRepoFiles.length === 0 ? (
+                    <p className="text-[13px] text-[#4a4a5a]">No files uploaded yet</p>
+                  ) : (
+                    recentRepoFiles.map((file, i) => (
+                      <div key={file.id || i} className="flex flex-col items-center gap-2">
+                        <FileTypeIcon type={file.type} name={file.name} size={72} />
+                        <p className="w-[90px] truncate text-center text-[14px] font-[590] text-white">{file.name}</p>
+                        <p className="text-[12px] capitalize text-[#d5d5d5]">{file.type || 'File'}</p>
+                      </div>
+                    ))
+                  )}
 
-                  {/* Photo file */}
-                  <div className="flex flex-col items-center gap-2">
-                    <img src={imgPhoto1} alt="photo" className="h-[72px] w-[72px] rounded-[8px] object-cover" />
-                    <p className="w-[90px] truncate text-center text-[14px] font-[590] text-white">Research Paper 3</p>
-                    <p className="text-[12px] text-[#d5d5d5]">Pdf</p>
-                  </div>
-
-                  {/* Link file */}
-                  <div className="flex flex-col items-center gap-2">
-                    <img src={imgLink1} alt="link" className="h-[72px] w-[72px] rounded-[8px] object-cover" />
-                    <p className="w-[90px] truncate text-center text-[14px] font-[590] text-white">Research Paper 3</p>
-                    <p className="text-[12px] text-[#d5d5d5]">Pdf</p>
-                  </div>
-
-                  {/* Open Repo link */}
+                  {/* Open Repo — navigates to the main repo */}
                   <div className="ml-auto flex flex-col justify-center">
                     <button
-                      onClick={() => setRepoToast(true)}
+                      onClick={() => navigate('/repo')}
                       className="cursor-pointer text-[12px] text-[#d5d5d5] underline transition-colors hover:text-white"
                     >
                       Open Repo
                     </button>
-                  </div>
-                </div>
-
-                {/* Arriving soon badge */}
-                <div className="mt-4 flex justify-center">
-                  <div className="flex items-center gap-2 rounded-[11px] border border-[rgba(178,197,242,0.32)] bg-[rgba(20,24,46,0.55)] px-4 py-2">
-                    <span className="text-[12px] font-bold tracking-[0.24px] text-[#b2c5f2]">Arriving soon</span>
                   </div>
                 </div>
               </div>
@@ -263,7 +247,7 @@ export default function AllFiles() {
                   coverIndex={doc.coverIndex}
                   timestamp={relativeTime(doc.updatedAt)}
                   size="small"
-                  onClick={() => navigate(`/doc/${doc._id}`)}
+                  onClick={() => navigate(`/project/${doc._id}?source=allfiles`)}
                   onMoveClick={() =>
                     setMovingDoc({ id: doc._id, title: doc.title, currentFolder: null })
                   }
@@ -273,6 +257,12 @@ export default function AllFiles() {
           </div>
           </div>
         </div>
+
+        <TodoPanel
+          isOpen={isTodoOpen}
+          onClose={() => setIsTodoOpen(false)}
+          firstName={user?.firstName}
+        />
       </div>
 
       {/* Move Modal */}
@@ -298,13 +288,6 @@ export default function AllFiles() {
           }
         }}
       />
-
-      {/* Repo toast */}
-      {repoToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-[11px] border border-[rgba(178,197,242,0.32)] bg-[rgba(20,24,46,0.95)] px-5 py-3 shadow-lg">
-          <span className="text-[13px] font-bold text-[#b2c5f2]">Repository Files — Arriving soon</span>
-        </div>
-      )}
     </div>
   )
 }

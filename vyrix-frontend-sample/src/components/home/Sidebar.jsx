@@ -1,8 +1,10 @@
 // Left sidebar for the Home dashboard.
 // <Sidebar user={{ firstName: string, profilePic: string | null }} activePage="home" />
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import api from '../../api/axios'
+import FeedbackModal from './FeedbackModal'
 
 // Figma assets (used directly per spec)
 const imgUser1 = 'https://www.figma.com/api/mcp/asset/90dd7b4b-58c0-48ad-910e-b606fd5b5a68'
@@ -133,18 +135,49 @@ export default function Sidebar({ user, activePage = 'home' }) {
 
   const navigate = useNavigate()
   const [toast, setToast] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const menuRef = useRef(null)
+  const menuBtnRef = useRef(null)
 
   const showArrivingSoon = () => {
     setToast(true)
     setTimeout(() => setToast(false), 2500)
   }
 
+  const handleLogout = async () => {
+    setMenuOpen(false)
+    try {
+      await api.post('/api/auth/logout')
+    } catch {
+      // even if the request fails, send the user to login
+    }
+    navigate('/login')
+  }
+
+  // Close the hamburger menu on outside click.
+  useEffect(() => {
+    if (!menuOpen) return
+    const onDown = (e) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target) &&
+        menuBtnRef.current &&
+        !menuBtnRef.current.contains(e.target)
+      ) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [menuOpen])
+
   // Per-item navigation action + the activePage value(s) that highlight it.
   const WORKSPACE_ACTIONS = {
     home: { activeKeys: ['home', 'folder', 'editor'], onClick: () => navigate('/home') },
     'all-files': { activeKeys: ['all-files', 'allfiles'], onClick: () => navigate('/all-files') },
     starred: { activeKeys: ['starred'], onClick: showArrivingSoon },
-    ai: { activeKeys: ['ai'], onClick: showArrivingSoon },
+    ai: { activeKeys: ['ai'], onClick: () => navigate('/ai') },
     community: { activeKeys: ['community'], onClick: showArrivingSoon },
   }
 
@@ -152,13 +185,47 @@ export default function Sidebar({ user, activePage = 'home' }) {
     <aside className="relative flex h-screen w-[320px] shrink-0 flex-col bg-black">
       {/* Top: hamburger + logo */}
       <div className="flex items-center gap-4 px-10 pt-[34px]">
-        <div className="flex flex-col gap-[6px]">
+        <button
+          ref={menuBtnRef}
+          type="button"
+          aria-label="Menu"
+          onClick={() => setMenuOpen((v) => !v)}
+          className="flex cursor-pointer flex-col gap-[6px]"
+        >
           <span className="h-[2px] w-[21px] rounded-full bg-white" />
           <span className="h-[2px] w-[21px] rounded-full bg-white" />
           <span className="h-[2px] w-[21px] rounded-full bg-white" />
-        </div>
+        </button>
         <img src={imgImage5} alt="Vyrix" className="h-[18px] w-[100px] object-contain" />
       </div>
+
+      {/* Hamburger dropdown menu */}
+      {menuOpen && (
+        <div
+          ref={menuRef}
+          className="absolute left-10 top-[72px] z-50 flex w-[300px] flex-col gap-3 rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(22,22,22,0.92)] p-[14px] shadow-[1px_4px_7.7px_5px_rgba(0,0,0,0.25)] backdrop-blur-md"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false)
+              setFeedbackOpen(true)
+            }}
+            className="h-[40px] w-full cursor-pointer rounded-[11px] bg-[#b2c5f2] font-sf text-[14px] font-[590] text-[#0e1022] transition-colors hover:bg-[#c5d4f5]"
+          >
+            Give Suggestion / Report a Bug
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="h-[40px] w-full cursor-pointer rounded-[11px] bg-[#b80407] font-sf text-[14px] font-[590] text-white transition-colors hover:bg-[#cf1417]"
+          >
+            Log Out
+          </button>
+        </div>
+      )}
+
+      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
       {/* User row */}
       <div className="mt-[29px] flex items-center gap-3 px-[25px]">
