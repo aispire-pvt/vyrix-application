@@ -12,34 +12,57 @@ const onboardingIpc    = require("./ipc/onboarding.ipc");
 
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 
+// Single-instance lock — required so second-instance fires on the running app
+// when a vyrix:// URL is launched, instead of Windows spawning a new instance.
+if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    process.exit(0);
+}
+
 // Register deep-link protocol for Google OAuth callback
 if (process.defaultApp) {
-    if (process.argv.length >= 2) app.setAsDefaultProtocolClient("vyrix", process.execPath, [path.resolve(process.argv[1])]);
+    if (process.argv.length >= 2) {
+        app.setAsDefaultProtocolClient("vyrix", process.execPath, [path.resolve(process.argv[1])]);
+    }
 } else {
     app.setAsDefaultProtocolClient("vyrix");
 }
 
+let win;
+let pendingDeepLink = null;
+
 function handleDeepLink(url) {
-    if (!win || !url) return;
+    if (!url) return;
     try {
         const parsed = new URL(url);
         if (parsed.pathname === "//auth" || parsed.host === "auth") {
             const token = parsed.searchParams.get("token");
             const error = parsed.searchParams.get("error");
-            win.webContents.send("auth:deepLink", { token, error });
-            win.focus();
+            const payload = { token, error };
+            if (win && win.webContents && !win.webContents.isLoading()) {
+                win.webContents.send("auth:deepLink", payload);
+                if (win.isMinimized()) win.restore();
+                win.focus();
+            } else {
+                pendingDeepLink = payload;
+            }
         }
     } catch {}
 }
 
-app.on("open-url", (_, url) => handleDeepLink(url));         // macOS
+// macOS — protocol delivered via open-url
+app.on("open-url", (_, url) => handleDeepLink(url));
+
+// Windows / Linux — protocol delivered as argv to a second instance
 app.on("second-instance", (_, argv) => {
-    const url = argv.find(a => a.startsWith("vyrix://"));
+    const url = argv.find((a) => typeof a === "string" && a.startsWith("vyrix://"));
     if (url) handleDeepLink(url);
     if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
 });
 
-let win;
+// First-launch case — protocol URL is in our own argv
+const firstLaunchUrl = process.argv.find((a) => typeof a === "string" && a.startsWith("vyrix://"));
+if (firstLaunchUrl) pendingDeepLink = { __pendingUrl: firstLaunchUrl };
 
 app.whenReady().then(() => {
     // Init SQLite before any IPC handler runs
@@ -76,9 +99,17 @@ app.whenReady().then(() => {
         win.loadFile(path.join(__dirname, "../dist/renderer/index.html"));
     }
 
-    // Send heartbeat on every launch
+    // Send heartbeat + flush pending deep link on every launch
     win.webContents.once("did-finish-load", () => {
         win.webContents.send("app:ready", { version: app.getVersion() });
+        if (pendingDeepLink) {
+            if (pendingDeepLink.__pendingUrl) {
+                handleDeepLink(pendingDeepLink.__pendingUrl);
+            } else {
+                win.webContents.send("auth:deepLink", pendingDeepLink);
+            }
+            pendingDeepLink = null;
+        }
     });
 });
 

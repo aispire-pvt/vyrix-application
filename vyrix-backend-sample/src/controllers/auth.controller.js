@@ -152,13 +152,35 @@ async function googleCallback(req, res) {
         await userModel.findByIdAndUpdate(user._id, { $set: tracking });
 
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
-
-        // Deep-link back into the Electron app
-        res.redirect(`vyrix://auth?token=${encodeURIComponent(token)}`);
+        const deepLink = `vyrix://auth?token=${encodeURIComponent(token)}`;
+        return res.send(renderHandoffPage({ deepLink, token }));
     } catch (err) {
         console.error("googleCallback error:", err);
-        res.redirect(`vyrix://auth?error=${encodeURIComponent(err.message)}`);
+        const deepLink = `vyrix://auth?error=${encodeURIComponent(err.message)}`;
+        return res.send(renderHandoffPage({ deepLink, error: err.message }));
     }
+}
+
+function renderHandoffPage({ deepLink, token, error }) {
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Vyrix Sign-in</title>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#000;color:#e1e1e1;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{max-width:460px;padding:48px 40px;text-align:center}
+h1{font-size:28px;margin:0 0 12px;color:#fff}
+p{color:#c7c7c7;line-height:1.6;margin:0 0 24px}
+a.btn{display:inline-block;background:#b2c5f2;color:#0e1022;font-weight:700;padding:14px 32px;border-radius:11px;text-decoration:none;font-size:16px}
+a.btn:hover{background:#c5d4f5}
+.hint{margin-top:32px;color:#6b6b6b;font-size:13px}
+code{display:block;margin-top:12px;padding:12px;background:#1e1e1e;border-radius:8px;font-size:11px;color:#8d8d97;word-break:break-all;user-select:all}
+.err{color:#ff7676;margin-bottom:16px}
+</style></head><body><div class="card">
+${error
+    ? `<h1>Sign-in failed</h1><p class="err">${error}</p>`
+    : `<h1>Signed in successfully</h1><p>Click below to return to Vyrix and complete sign-in.</p>`}
+<a class="btn" href="${deepLink}">${error ? "Return to Vyrix" : "Open Vyrix"}</a>
+${token ? `<div class="hint">Vyrix should open automatically. If it doesn't, copy this code into the app:<code>${token}</code></div>` : ""}
+<script>setTimeout(function(){window.location.href=${JSON.stringify(deepLink)}},500);</script>
+</div></body></html>`;
 }
 
 async function googleAuth(req, res) {
