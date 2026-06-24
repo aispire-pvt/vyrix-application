@@ -83,6 +83,14 @@ function register(ipcMain) {
         return attachment;
     });
 
+    ipcMain.handle("attachments:rename", (_, projectId, attachmentId, name) => {
+        const list = readAttachments(projectId);
+        const att  = list.find((a) => a.id === attachmentId);
+        if (att) att.name = name;
+        writeAttachments(projectId, list);
+        return { ok: true };
+    });
+
     ipcMain.handle("attachments:remove", (_, projectId, attachmentId) => {
         const list = readAttachments(projectId);
         const att  = list.find((a) => a.id === attachmentId);

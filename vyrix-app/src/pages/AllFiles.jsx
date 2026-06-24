@@ -32,7 +32,7 @@ export default function AllFiles() {
 
   useEffect(() => {
     let active = true
-    Promise.all([getMe(), projects.list(), foldersApi.list(null)])
+    Promise.all([getMe(), projects.listFull(), foldersApi.list(null)])
       .then(([userRes, docRows, folderRows]) => {
         if (!active) return
         if (!userRes.success) { navigate('/login'); return }
@@ -57,7 +57,7 @@ export default function AllFiles() {
       ...(doc.attachments || []),
       ...(doc.flows || []).flatMap((f) => f.files || []),
     ])
-    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    .sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0))
     .slice(0, 3)
 
   const handleCreateDoc = async () => {

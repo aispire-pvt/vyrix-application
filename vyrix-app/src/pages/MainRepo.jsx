@@ -25,7 +25,7 @@ export default function MainRepo() {
 
   useEffect(() => {
     let active = true
-    Promise.all([getMe(), projects.list()])
+    Promise.all([getMe(), projects.listFull()])
       .then(([userRes, docRows]) => {
         if (!active) return
         if (!userRes.success) { navigate('/login'); return }

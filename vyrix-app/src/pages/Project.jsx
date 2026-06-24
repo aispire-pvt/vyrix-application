@@ -37,7 +37,7 @@ export default function Project() {
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [showLinkInput, setShowLinkInput] = useState(false)
   const [linkUrl, setLinkUrl]       = useState('')
-  const [devToast, setDevToast]     = useState(false)
+  const [externalDialog, setExternalDialog] = useState(null) // { type: 'canva'|'figma', url: '' }
   const [flowModalOpen, setFlowModalOpen] = useState(false)
   const [aiOpen, setAiOpen]         = useState(false)
   const saveTimerRef = useRef(null)
@@ -99,16 +99,15 @@ export default function Project() {
   // Create a child TipTap doc, attach it as a document-type attachment
   const handleCreateDocument = async () => {
     try {
-      const newDoc = await projects.create()
-      await attachmentsApi.addLink(id, {
-        type: 'document',
-        name: 'Untitled',
-        url:  `/doc/${newDoc.id}`,
+      const newDoc = await projects.create(id)
+      const att = await attachmentsApi.addLink(id, {
+        type:  'document',
+        name:  'Untitled',
+        url:   `/doc/${newDoc.id}`,
         docId: newDoc.id,
       })
-      const refreshed = await projects.get(id)
-      setDoc(refreshed)
-      navigate(`/doc/${newDoc.id}?projectId=${id}`)
+      setDoc((prev) => ({ ...prev, attachments: [...(prev.attachments || []), att] }))
+      navigate(`/doc/${newDoc.id}?projectId=${id}&attId=${att.id}`)
     } catch (err) { console.error('Failed to create document:', err) }
   }
 
@@ -134,9 +133,23 @@ export default function Project() {
     } catch (err) { console.error('Failed to add file:', err) }
   }
 
-  const showDevToast = () => {
-    setDevToast(true)
-    setTimeout(() => setDevToast(false), 2500)
+  const handleOpenExternal = (type) => {
+    const urls = { canva: 'https://www.canva.com', figma: 'https://www.figma.com' }
+    window.open(urls[type], '_blank')
+    setExternalDialog({ type, url: '' })
+  }
+
+  const handleSaveExternalLink = async () => {
+    if (!externalDialog?.url?.trim()) return
+    try {
+      const att = await attachmentsApi.addLink(id, {
+        type: externalDialog.type,
+        name: externalDialog.url.trim(),
+        url:  externalDialog.url.trim(),
+      })
+      setDoc((prev) => ({ ...prev, attachments: [...(prev.attachments || []), att] }))
+      setExternalDialog(null)
+    } catch (err) { console.error('Failed to save link:', err) }
   }
 
   const handleFlowsChange = (flowList) => {
@@ -275,8 +288,8 @@ export default function Project() {
                         onCreateDocument={handleCreateDocument}
                         onAddLink={() => { setShowLinkInput(true); setShowAddMenu(false) }}
                         onAddFile={handleAddFile}
-                        onCanva={() => { window.open('https://www.canva.com', '_blank'); showDevToast() }}
-                        onFigma={() => { window.open('https://www.figma.com', '_blank'); showDevToast() }}
+                        onCanva={() => handleOpenExternal('canva')}
+                        onFigma={() => handleOpenExternal('figma')}
                         onClose={() => setShowAddMenu(false)}
                       />
                     )}
@@ -353,9 +366,33 @@ export default function Project() {
         </button>
       )}
 
-      {devToast && (
-        <div className="fixed bottom-6 right-6 z-50 rounded-[11px] border border-[rgba(178,197,242,0.32)] bg-[rgba(20,24,46,0.95)] px-5 py-3 shadow-lg">
-          <span className="text-[13px] font-bold text-[#b2c5f2]">In Development — coming soon</span>
+      {externalDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-[420px] rounded-[20px] border border-[rgba(178,197,242,0.2)] bg-[#0e1022] p-7 shadow-2xl">
+            <h3 className="mb-1 font-unbounded text-[18px] font-medium text-white capitalize">
+              {externalDialog.type} Link
+            </h3>
+            <p className="mb-5 font-sf text-[13px] text-[#8d8d97]">
+              {externalDialog.type === 'canva' ? 'Canva' : 'Figma'} has opened in your browser. Create or open your file, copy its share link, then paste it below.
+            </p>
+            <input
+              autoFocus
+              type="url"
+              placeholder={externalDialog.type === 'canva' ? 'https://www.canva.com/design/...' : 'https://www.figma.com/file/...'}
+              value={externalDialog.url}
+              onChange={(e) => setExternalDialog((d) => ({ ...d, url: e.target.value }))}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveExternalLink(); if (e.key === 'Escape') setExternalDialog(null) }}
+              className="w-full rounded-[10px] border border-[rgba(178,197,242,0.3)] bg-[rgba(255,255,255,0.05)] px-4 py-3 text-[14px] text-white outline-none placeholder:text-[#4a4a5a] focus:border-[rgba(178,197,242,0.6)]"
+            />
+            <div className="mt-5 flex justify-end gap-3">
+              <button onClick={() => setExternalDialog(null)} className="cursor-pointer rounded-[10px] px-4 py-2 text-[13px] text-[#8d8d97] transition-colors hover:text-white">
+                Cancel
+              </button>
+              <button onClick={handleSaveExternalLink} className="cursor-pointer rounded-[10px] bg-[#b2c5f2] px-5 py-2 text-[13px] font-bold text-black transition-colors hover:bg-[#c5d4f5]">
+                Save Link
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

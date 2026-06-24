@@ -3,7 +3,7 @@ import axios from 'axios'
 // Used only for auth / onboarding / feedback / catalog routes.
 // Docs, folders, todos go through window.vyrix IPC — not axios.
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+  baseURL: import.meta.env.VITE_API_URL || 'https://vyrix-app.onrender.com',
   // No withCredentials — Electron uses Bearer tokens via the main process.
   // Auth calls go through window.vyrix.login() / getMe() — not directly here.
 })

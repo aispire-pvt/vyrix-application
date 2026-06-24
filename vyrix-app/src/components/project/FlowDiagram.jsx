@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FlowNode from './FlowNode'
-import api from '../../api/axios'
+import { flows as flowsApi } from '../../api/local'
 
 // Props: { projectId, flows, onReordered, onAddFlow }
 export default function FlowDiagram({ projectId, flows = [], onReordered, onAddFlow }) {
@@ -36,9 +36,7 @@ export default function FlowDiagram({ projectId, flows = [], onReordered, onAddF
       // Save the new order
       setSaving(true)
       try {
-        await api.patch(`/api/docs/${projectId}/flows/reorder`, {
-          flowIds: localFlows.map((f) => f.id),
-        })
+        await flowsApi.reorder(projectId, localFlows.map((f) => f.id))
         onReordered?.(localFlows)
       } catch (err) {
         console.error('Failed to save flow order:', err)
@@ -56,8 +54,8 @@ export default function FlowDiagram({ projectId, flows = [], onReordered, onAddF
   const handleAddFlow = async () => {
     const name = newFlowName.trim() || 'New Flow'
     try {
-      const { data } = await api.post(`/api/docs/${projectId}/flows`, { name })
-      onAddFlow?.(data.flow)
+      const flow = await flowsApi.create(projectId, name)
+      onAddFlow?.(flow)
     } catch (err) {
       console.error('Failed to add flow:', err)
     } finally {

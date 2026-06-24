@@ -2,19 +2,23 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("vyrix", {
     // ── Auth ──────────────────────────────────────────────────────────────────
-    login:          (email, password) => ipcRenderer.invoke("auth:login", email, password),
+    register:       (creds)           => ipcRenderer.invoke("auth:register", creds.firstName, creds.lastName, creds.email, creds.password),
+    login:          (creds)           => ipcRenderer.invoke("auth:login", creds.email, creds.password),
     loginGoogle:    ()                => ipcRenderer.invoke("auth:loginGoogle"),
     googleCallback: (accessToken)     => ipcRenderer.invoke("auth:googleCallback", accessToken),
+    saveToken:      (token)           => ipcRenderer.invoke("auth:saveToken", token),
     logout:         ()                => ipcRenderer.invoke("auth:logout"),
     getMe:          ()                => ipcRenderer.invoke("auth:getMe"),
     heartbeat:      (appVersion)      => ipcRenderer.invoke("auth:heartbeat", appVersion),
     logUsage:       (counters)        => ipcRenderer.invoke("auth:logUsage", counters),
+    sendFeedback:   (type, message)   => ipcRenderer.invoke("feedback:send", type, message),
 
     // ── Projects ──────────────────────────────────────────────────────────────
     projects: {
         list:   ()                   => ipcRenderer.invoke("projects:list"),
+        listFull: ()                 => ipcRenderer.invoke("projects:listFull"),
         get:    (id)                 => ipcRenderer.invoke("projects:get", id),
-        create: ()                   => ipcRenderer.invoke("projects:create"),
+        create: (parentId)           => ipcRenderer.invoke("projects:create", parentId || null),
         save:   (id, patch)          => ipcRenderer.invoke("projects:save", id, patch),
         delete: (id)                 => ipcRenderer.invoke("projects:delete", id),
         move:   (id, folderId)       => ipcRenderer.invoke("projects:move", id, folderId),
@@ -39,9 +43,10 @@ contextBridge.exposeInMainWorld("vyrix", {
 
     // ── Attachments ───────────────────────────────────────────────────────────
     attachments: {
-        add:     (projectId, sourcePath, meta) => ipcRenderer.invoke("attachments:add", projectId, sourcePath, meta),
-        addLink: (projectId, meta)             => ipcRenderer.invoke("attachments:addLink", projectId, meta),
-        remove:  (projectId, attachmentId)     => ipcRenderer.invoke("attachments:remove", projectId, attachmentId),
+        add:     (projectId, sourcePath, meta)        => ipcRenderer.invoke("attachments:add", projectId, sourcePath, meta),
+        addLink: (projectId, meta)                    => ipcRenderer.invoke("attachments:addLink", projectId, meta),
+        rename:  (projectId, attachmentId, name)      => ipcRenderer.invoke("attachments:rename", projectId, attachmentId, name),
+        remove:  (projectId, attachmentId)            => ipcRenderer.invoke("attachments:remove", projectId, attachmentId),
     },
 
     // ── Flows ─────────────────────────────────────────────────────────────────
@@ -53,6 +58,13 @@ contextBridge.exposeInMainWorld("vyrix", {
         reorder: (projectId, flowIds)                  => ipcRenderer.invoke("flows:reorder", projectId, flowIds),
     },
 
+    // ── Onboarding ────────────────────────────────────────────────────────────
+    onboarding: {
+        sendOtp:     ()                          => ipcRenderer.invoke("onboarding:sendOtp"),
+        verifyOtp:   (otp)                       => ipcRenderer.invoke("onboarding:verifyOtp", otp),
+        saveProfile: (username, profession, file) => ipcRenderer.invoke("onboarding:saveProfile", username, profession, file),
+    },
+
     // ── Sync ──────────────────────────────────────────────────────────────────
     sync: {
         drain: () => ipcRenderer.invoke("sync:drain"),
@@ -60,7 +72,7 @@ contextBridge.exposeInMainWorld("vyrix", {
 
     // ── App events (renderer listens for these) ───────────────────────────────
     on: (channel, fn) => {
-        const allowed = ["app:ready"];
+        const allowed = ["app:ready", "auth:deepLink"];
         if (allowed.includes(channel)) ipcRenderer.on(channel, fn);
     },
     off: (channel, fn) => ipcRenderer.removeListener(channel, fn),

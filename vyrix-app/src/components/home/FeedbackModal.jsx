@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import api from '../../api/axios'
 
 // Suggestion / bug-report modal. Same dark vibe as the move modal.
 export default function FeedbackModal({ isOpen, onClose }) {
@@ -40,11 +39,12 @@ export default function FeedbackModal({ isOpen, onClose }) {
     setSubmitting(true)
     setError('')
     try {
-      await api.post('/api/feedback', { type, message: text })
+      const result = await window.vyrix.sendFeedback(type, text)
+      if (!result?.success) { setError(result?.message || 'Could not send. Please try again.'); setSubmitting(false); return }
       setDone(true)
       setTimeout(onClose, 1600)
-    } catch (err) {
-      setError(err.response?.data?.message || 'Could not send. Please try again.')
+    } catch {
+      setError('Could not send. Please try again.')
       setSubmitting(false)
     }
   }

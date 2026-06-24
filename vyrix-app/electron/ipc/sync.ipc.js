@@ -1,7 +1,7 @@
 const { getDB }      = require("./db");
 const { randomUUID } = require("crypto");
 
-const API         = process.env.API_URL || "https://vyrix.onrender.com";
+const API         = process.env.API_URL || "https://vyrix-app.onrender.com";
 const debounceMap = new Map(); // projectId → timer handle
 
 // ── public API ─────────────────────────────────────────────────────────────────

@@ -37,30 +37,33 @@ export default function Login() {
     }
   }
 
-  const handleGoogle = async () => {
+  const handleGoogle = () => {
     setError('')
     setLoading(true)
-    try {
-      const result = await window.vyrix.loginGoogle()
-      if (!result?.success) { setError(result?.message || 'Google sign-in failed.'); return }
-      navigate('/home')
-    } catch {
-      setError('Google sign-in was cancelled.')
-    } finally {
+    window.vyrix.loginGoogle()
+
+    const onDeepLink = (_, { token, error: err }) => {
+      window.vyrix.off('auth:deepLink', onDeepLink)
       setLoading(false)
+      if (err || !token) { setError(err || 'Google sign-in failed.'); return }
+      window.vyrix.saveToken(token).then((result) => {
+        if (!result?.success) { setError(result?.message || 'Google sign-in failed.'); return }
+        navigate('/home')
+      })
     }
+    window.vyrix.on('auth:deepLink', onDeepLink)
   }
 
   return (
-    <div className="relative flex min-h-screen w-full items-start justify-center overflow-hidden bg-black">
+    <div className="relative flex h-screen w-full items-center justify-center overflow-hidden bg-black">
       <img src={bgImage} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top" />
 
-      <form onSubmit={handleSubmit} className="relative z-10 flex w-[434px] max-w-[90%] flex-col items-center pt-[180px] pb-16">
-        <img src={logo} alt="Vyrix" className="w-[316px] max-w-full" />
+      <form onSubmit={handleSubmit} className="relative z-10 flex w-[434px] max-w-[90%] flex-col items-center py-8">
+        <img src={logo} alt="Vyrix" className="w-[220px] max-w-full" />
 
-        <h1 className="mt-[80px] whitespace-nowrap text-center font-unbounded text-[40px] font-medium leading-tight text-white">Log in your Account</h1>
+        <h1 className="mt-6 whitespace-nowrap text-center font-unbounded text-[28px] font-medium leading-tight text-white">Log in your Account</h1>
 
-        <div className="mt-10 flex w-full flex-col gap-[18px]">
+        <div className="mt-7 flex w-full flex-col gap-[14px]">
           <InputField label="Email" placeholder="eg. Johnparker@vyrix.com" type="email" value={form.email} onChange={update('email')} />
           <InputField
             label="Password" placeholder="Enter your password"
@@ -74,16 +77,16 @@ export default function Login() {
           />
         </div>
 
-        {error && <p className="mt-4 w-full text-center font-sf text-[14px] text-red-400">{error}</p>}
+        {error && <p className="mt-3 w-full text-center font-sf text-[13px] text-red-400">{error}</p>}
 
-        <Button variant="primary" className="mt-7" type="submit">{loading ? 'Signing in...' : 'Sign in'}</Button>
-        <Divider className="mt-6 w-full" />
-        <Button variant="outline" className="mt-6" type="button" onClick={handleGoogle}>
+        <Button variant="primary" className="mt-5" type="submit">{loading ? 'Signing in...' : 'Sign in'}</Button>
+        <Divider className="mt-5 w-full" />
+        <Button variant="outline" className="mt-5" type="button" onClick={handleGoogle}>
           <img src={googleIcon} alt="" className="h-[22px] w-[22px]" />
           Google
         </Button>
 
-        <p className="mt-7 text-center font-sf text-[14px] text-vyrix-placeholder">
+        <p className="mt-5 text-center font-sf text-[14px] text-vyrix-placeholder">
           Dont have an Account?{' '}
           <button type="button" onClick={() => navigate('/signup')} className="font-bold text-vyrix-link-purple">Sign Up</button>
         </p>

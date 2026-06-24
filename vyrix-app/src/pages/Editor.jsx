@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { getMe, projects } from '../api/local'
+import { getMe, projects, attachments as attachmentsApi } from '../api/local'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
 import SaveIndicator from '../components/editor/SaveIndicator'
@@ -13,6 +13,7 @@ export default function Editor() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const projectId = searchParams.get('projectId')
+  const attId     = searchParams.get('attId')
 
   const [user, setUser]           = useState(null)
   const [doc, setDoc]             = useState(null)
@@ -47,6 +48,10 @@ export default function Editor() {
     try {
       await projects.save(id, { title: trimmed })
       setDoc((prev) => ({ ...prev, title: trimmed }))
+      // Sync name back to parent project's attachment entry
+      if (projectId && attId) {
+        attachmentsApi.rename(projectId, attId, trimmed).catch(() => {})
+      }
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {

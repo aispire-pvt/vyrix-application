@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../api/axios'
 import InputField from '../components/ui/InputField'
 import Button from '../components/ui/Button'
 import OnboardingSidebar from '../components/onboarding/OnboardingSidebar'
@@ -27,29 +26,18 @@ export default function Profile() {
 
   useEffect(() => {
     let active = true
-    api
-      .get('/api/auth/me')
-      .then(({ data }) => {
+    window.vyrix.getMe()
+      .then((data) => {
         if (!active) return
         const u = data.user
-        if (u?.onboardingCompleted) {
-          navigate('/home')
-          return
-        }
+        if (!u) { navigate('/login'); return }
+        if (u?.onboardingCompleted) { navigate('/home'); return }
         setAlreadyVerified(!!u?.emailVerified)
-        setForm((f) => ({
-          ...f,
-          username: u?.username || '',
-          profession: u?.profession || '',
-        }))
+        setForm((f) => ({ ...f, username: u?.username || '', profession: u?.profession || '' }))
         setChecking(false)
       })
-      .catch(() => {
-        if (active) navigate('/login')
-      })
-    return () => {
-      active = false
-    }
+      .catch(() => { if (active) navigate('/login') })
+    return () => { active = false }
   }, [navigate])
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value })
@@ -68,13 +56,12 @@ export default function Profile() {
     setInfo('')
     setSendingOtp(true)
     try {
-      const { data } = await api.post('/api/onboarding/send-otp')
+      const data = await window.vyrix.onboarding.sendOtp()
+      if (!data.success) { setError(data.message || 'Could not send the verification code.'); return }
       setOtpSent(true)
       setInfo(data.message || 'A verification code has been sent to your email.')
-    } catch (err) {
-      setError(
-        err.response?.data?.message || 'Could not send the verification code.'
-      )
+    } catch {
+      setError('Could not send the verification code.')
     } finally {
       setSendingOtp(false)
     }
@@ -95,23 +82,17 @@ export default function Profile() {
     setSubmitting(true)
     try {
       if (!alreadyVerified) {
-        await api.post('/api/onboarding/verify-otp', { otp: form.otp })
+        const otpRes = await window.vyrix.onboarding.verifyOtp(form.otp)
+        if (!otpRes.success) { setError(otpRes.message || 'Invalid verification code.'); return }
       }
 
-      const fd = new FormData()
-      fd.append('username', form.username)
-      fd.append('profession', form.profession)
-      if (file) fd.append('profile_pic', file)
-
-      await api.post('/api/onboarding/profile', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      const filePath = file?.path || null
+      const profileRes = await window.vyrix.onboarding.saveProfile(form.username.trim(), form.profession.trim(), filePath)
+      if (!profileRes.success) { setError(profileRes.message || 'Something went wrong.'); return }
 
       navigate('/tutorials')
-    } catch (err) {
-      setError(
-        err.response?.data?.message || 'Something went wrong. Please try again.'
-      )
+    } catch {
+      setError('Something went wrong. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -126,17 +107,17 @@ export default function Profile() {
   }
 
   return (
-    <div className="flex min-h-screen w-full items-stretch gap-8 bg-black p-7">
+    <div className="flex h-screen w-full items-stretch gap-6 bg-black p-5">
       {/* Left panel — steps 1 & 2 active */}
       <OnboardingSidebar activeStep={2} />
 
       {/* Right panel — profile form */}
-      <section className="flex flex-1 items-center justify-center px-4 py-10">
+      <section className="flex flex-1 items-center justify-center px-4 py-6">
         <div className="flex w-[434px] max-w-full flex-col">
-          <h1 className="whitespace-nowrap text-center font-unbounded text-[40px] font-medium leading-tight text-white">
+          <h1 className="whitespace-nowrap text-center font-unbounded text-[28px] font-medium leading-tight text-white">
             Setting up your Profile
           </h1>
-          <p className="mt-3 text-center font-sf text-[20px] text-vyrix-label">
+          <p className="mt-2 text-center font-sf text-[15px] text-vyrix-label">
             Create your personal profile
           </p>
 

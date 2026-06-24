@@ -46,6 +46,12 @@ function initDB() {
             attempts   INTEGER NOT NULL DEFAULT 0
         );
     `);
+
+    // Migration: add parent_id column to existing databases
+    const cols = db.prepare("PRAGMA table_info(projects)").all().map((c) => c.name);
+    if (!cols.includes("parent_id")) {
+        db.exec("ALTER TABLE projects ADD COLUMN parent_id TEXT REFERENCES projects(id) ON DELETE CASCADE");
+    }
 }
 
 function getDB() {

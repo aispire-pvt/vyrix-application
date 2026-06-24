@@ -28,15 +28,15 @@ export default function OnboardingSidebar({ activeStep = 1 }) {
       />
 
       {/* Heading + steps (lower area) */}
-      <div className="relative z-10 flex h-full flex-col items-center justify-end px-12 pb-[11%] text-center">
-        <h2 className="font-unbounded text-[40px] font-medium leading-tight text-white">
+      <div className="relative z-10 flex h-full flex-col items-center justify-end px-12 pb-[8%] text-center">
+        <h2 className="font-unbounded text-[28px] font-medium leading-tight text-white">
           Get Started with Us
         </h2>
-        <p className="mt-4 max-w-[439px] font-sf text-[20px] text-vyrix-placeholder">
+        <p className="mt-3 max-w-[439px] font-sf text-[16px] text-vyrix-placeholder">
           Complete these easy steps to get started with your research journey.
         </p>
 
-        <div className="mt-9 flex w-[389px] max-w-full flex-col gap-3">
+        <div className="mt-6 flex w-[389px] max-w-full flex-col gap-3">
           {STEPS.map((step) => (
             <StepButton
               key={step.number}

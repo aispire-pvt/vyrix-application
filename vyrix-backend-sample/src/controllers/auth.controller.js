@@ -45,7 +45,7 @@ async function registerUser(req, res) {
         const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
         res.cookie("token", token, cookieOptions);
 
-        return res.status(201).json({ success: true, message: "User has been created successfully" });
+        return res.status(201).json({ success: true, accessToken: token, tokenType: "Bearer", expiresIn: 900, message: "User has been created successfully" });
     } catch (error) {
         console.error("registerUser error:", error);
         return res.status(500).json({ success: false, message: "Internal server error" });
@@ -95,6 +95,70 @@ async function loginUser(req, res) {
 async function logoutUser(req, res) {
     res.clearCookie("token", { httpOnly: true, sameSite: isProd ? "none" : "lax", secure: isProd });
     return res.status(200).json({ success: true, message: "Logged out" });
+}
+
+// ── Electron desktop Google OAuth (browser-redirect flow) ─────────────────────
+
+function googleRedirect(req, res) {
+    const clientId    = process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = `${process.env.API_URL || "https://vyrix-app.onrender.com"}/api/auth/google-callback`;
+    const scope       = encodeURIComponent("openid email profile");
+    const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}&access_type=offline&prompt=select_account`;
+    res.redirect(url);
+}
+
+async function googleCallback(req, res) {
+    const { code } = req.query;
+    const redirectUri = `${process.env.API_URL || "https://vyrix-app.onrender.com"}/api/auth/google-callback`;
+
+    try {
+        // Exchange code for tokens
+        const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+                code,
+                client_id:     process.env.GOOGLE_CLIENT_ID,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET,
+                redirect_uri:  redirectUri,
+                grant_type:    "authorization_code",
+            }),
+        });
+        const tokens = await tokenRes.json();
+        if (!tokens.access_token) throw new Error("No access_token from Google");
+
+        // Get user profile
+        const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+        const profile = await profileRes.json();
+
+        const email    = (profile.email || "").toLowerCase();
+        const googleId = profile.sub;
+        const name     = profile.name || email.split("@")[0];
+        if (!email) throw new Error("No email from Google");
+
+        let user = await userModel.findOne({ email });
+        if (!user) {
+            user = await userModel.create({ name, email, googleId, emailVerified: true });
+        } else {
+            const upd = {};
+            if (!user.googleId)      upd.googleId      = googleId;
+            if (!user.emailVerified) upd.emailVerified  = true;
+            if (Object.keys(upd).length) await userModel.findByIdAndUpdate(user._id, { $set: upd });
+        }
+
+        const tracking = loginTrackingFields(user, null);
+        await userModel.findByIdAndUpdate(user._id, { $set: tracking });
+
+        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "15m" });
+
+        // Deep-link back into the Electron app
+        res.redirect(`vyrix://auth?token=${encodeURIComponent(token)}`);
+    } catch (err) {
+        console.error("googleCallback error:", err);
+        res.redirect(`vyrix://auth?error=${encodeURIComponent(err.message)}`);
+    }
 }
 
 async function googleAuth(req, res) {
@@ -246,4 +310,4 @@ async function logUsage(req, res) {
     }
 }
 
-module.exports = { registerUser, loginUser, logoutUser, googleAuth, getMe, heartbeat, logUsage };
+module.exports = { registerUser, loginUser, logoutUser, googleAuth, googleRedirect, googleCallback, getMe, heartbeat, logUsage };

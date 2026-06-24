@@ -4,7 +4,7 @@ const https  = require("https");
 const http   = require("http");
 
 const store = new Store();
-const API   = process.env.API_URL || "https://vyrix.onrender.com";
+const API   = process.env.API_URL || "https://vyrix-app.onrender.com";
 
 // ── token helpers ──────────────────────────────────────────────────────────────
 
@@ -75,6 +75,15 @@ function apiFetch(path, opts = {}) {
 // ── ipc handlers ──────────────────────────────────────────────────────────────
 
 function register(ipcMain) {
+    ipcMain.handle("auth:register", async (_, firstName, lastName, email, password) => {
+        const data = await apiFetch("/api/auth/register", {
+            method: "POST",
+            body:   { firstName, lastName, email, password },
+        });
+        if (data.accessToken) saveToken(data.accessToken);
+        return data;
+    });
+
     ipcMain.handle("auth:login", async (_, email, password) => {
         const data = await apiFetch("/api/auth/login", {
             method: "POST",
@@ -138,11 +147,25 @@ function register(ipcMain) {
         }
     });
 
-    // Google OAuth opens the system browser; the deep-link callback
-    // completes via auth:googleCallback from the renderer after redirect.
     ipcMain.handle("auth:loginGoogle", async () => {
         shell.openExternal(`${API}/api/auth/google-redirect`);
         return { pending: true };
+    });
+
+    // Generic feedback endpoint (avoids CORS by going through main process)
+    ipcMain.handle("feedback:send", async (_, type, message) => {
+        return apiFetch("/api/feedback", { method: "POST", body: { type, message } });
+    });
+
+    // Called by the renderer after the deep-link delivers the JWT
+    ipcMain.handle("auth:saveToken", async (_, token) => {
+        try {
+            saveToken(token);
+            const data = await apiFetch("/api/auth/me");
+            return { success: true, ...data };
+        } catch {
+            return { success: false, message: "Failed to verify token" };
+        }
     });
 }
 

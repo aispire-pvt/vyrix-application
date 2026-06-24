@@ -6,7 +6,7 @@ function register(ipcMain) {
         return getDB()
             .prepare(
                 `SELECT f.*,
-                        (SELECT COUNT(*) FROM projects p WHERE p.folder_id = f.id) AS doc_count
+                        (SELECT COUNT(*) FROM projects p WHERE p.folder_id = f.id AND p.parent_id IS NULL) AS doc_count
                  FROM folders f
                  WHERE f.parent_id IS ?
                  ORDER BY f.created_at DESC`
@@ -20,15 +20,15 @@ function register(ipcMain) {
 
         const docs = getDB()
             .prepare(
-                `SELECT id, title, cover_index, updated_at
-                 FROM projects WHERE folder_id = ? ORDER BY updated_at DESC`
+                `SELECT id, title, cover_index, created_at, updated_at
+                 FROM projects WHERE folder_id = ? AND parent_id IS NULL ORDER BY updated_at DESC`
             )
             .all(id);
 
         const subFolders = getDB()
             .prepare(
                 `SELECT f.*,
-                        (SELECT COUNT(*) FROM projects p WHERE p.folder_id = f.id) AS doc_count
+                        (SELECT COUNT(*) FROM projects p WHERE p.folder_id = f.id AND p.parent_id IS NULL) AS doc_count
                  FROM folders f WHERE f.parent_id = ? ORDER BY f.created_at DESC`
             )
             .all(id);

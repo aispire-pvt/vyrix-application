@@ -48,12 +48,12 @@ export default function GreetingHeader({ firstName, docs = [], onOpenDoc, onMove
           <div className="flex gap-[18px]">
             {recent.map((doc) => (
               <DocumentCard
-                key={doc._id}
+                key={doc.id}
                 size="large"
                 title={doc.title}
-                coverIndex={doc.coverIndex}
-                timestamp={relativeTime(doc.updatedAt)}
-                onClick={() => onOpenDoc?.(doc._id)}
+                coverIndex={doc.cover_index}
+                timestamp={relativeTime(doc.updated_at)}
+                onClick={() => onOpenDoc?.(doc.id)}
                 onMoveClick={() => onMoveDoc?.(doc)}
               />
             ))}

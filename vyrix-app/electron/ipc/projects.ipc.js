@@ -27,9 +27,22 @@ function register(ipcMain) {
         return getDB()
             .prepare(
                 `SELECT id, title, cover_index, folder_id, created_at, updated_at
-                 FROM projects ORDER BY updated_at DESC`
+                 FROM projects WHERE parent_id IS NULL ORDER BY updated_at DESC`
             )
             .all();
+    });
+
+    // Full rows with attachments + flows parsed — for Repo / AllFiles aggregation
+    ipcMain.handle("projects:listFull", () => {
+        const rows = getDB()
+            .prepare(`SELECT * FROM projects WHERE parent_id IS NULL ORDER BY updated_at DESC`)
+            .all();
+        return rows.map((row) => ({
+            ...row,
+            content:     JSON.parse(row.content),
+            flows:       JSON.parse(row.flows),
+            attachments: JSON.parse(row.attachments),
+        }));
     });
 
     ipcMain.handle("projects:get", (_, id) => {
@@ -43,19 +56,19 @@ function register(ipcMain) {
         };
     });
 
-    ipcMain.handle("projects:create", () => {
+    ipcMain.handle("projects:create", (_, parentId) => {
         const id         = randomUUID();
         const now        = new Date().toISOString();
         const coverIndex = Math.floor(Math.random() * 4);
-        const flows      = JSON.stringify(buildDefaultFlows());
+        const flows      = JSON.stringify(parentId ? [] : buildDefaultFlows());
 
         getDB()
             .prepare(
                 `INSERT INTO projects
-                 (id, title, description, content, cover_index, flows, attachments, created_at, updated_at)
-                 VALUES (?, 'Untitled', '', '{}', ?, ?, '[]', ?, ?)`
+                 (id, title, description, content, cover_index, parent_id, flows, attachments, created_at, updated_at)
+                 VALUES (?, 'Untitled', '', '{}', ?, ?, ?, '[]', ?, ?)`
             )
-            .run(id, coverIndex, flows, now, now);
+            .run(id, coverIndex, parentId || null, flows, now, now);
 
         return { id, title: "Untitled", cover_index: coverIndex, updated_at: now };
     });

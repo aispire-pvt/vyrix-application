@@ -8,8 +8,36 @@ const foldersIpc       = require("./ipc/folders.ipc");
 const todosIpc         = require("./ipc/todos.ipc");
 const attachmentsIpc   = require("./ipc/attachments.ipc");
 const syncIpc          = require("./ipc/sync.ipc");
+const onboardingIpc    = require("./ipc/onboarding.ipc");
 
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+
+// Register deep-link protocol for Google OAuth callback
+if (process.defaultApp) {
+    if (process.argv.length >= 2) app.setAsDefaultProtocolClient("vyrix", process.execPath, [path.resolve(process.argv[1])]);
+} else {
+    app.setAsDefaultProtocolClient("vyrix");
+}
+
+function handleDeepLink(url) {
+    if (!win || !url) return;
+    try {
+        const parsed = new URL(url);
+        if (parsed.pathname === "//auth" || parsed.host === "auth") {
+            const token = parsed.searchParams.get("token");
+            const error = parsed.searchParams.get("error");
+            win.webContents.send("auth:deepLink", { token, error });
+            win.focus();
+        }
+    } catch {}
+}
+
+app.on("open-url", (_, url) => handleDeepLink(url));         // macOS
+app.on("second-instance", (_, argv) => {
+    const url = argv.find(a => a.startsWith("vyrix://"));
+    if (url) handleDeepLink(url);
+    if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+});
 
 let win;
 
@@ -24,10 +52,10 @@ app.whenReady().then(() => {
     todosIpc.register(ipcMain);
     attachmentsIpc.register(ipcMain);
     syncIpc.register(ipcMain);
+    onboardingIpc.register(ipcMain);
 
     win = new BrowserWindow({
-        width:  1280,
-        height: 800,
+        show:      false,
         minWidth:  900,
         minHeight: 600,
         webPreferences: {
@@ -39,6 +67,8 @@ app.whenReady().then(() => {
     });
 
     win.setMenuBarVisibility(false);
+    win.maximize();
+    win.show();
 
     if (isDev) {
         win.loadURL("http://localhost:5173");
