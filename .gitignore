@@ -10,6 +10,8 @@ dist/
 # Local Claude / editor settings
 .claude/
 .kiro/
+.mcp.json
+**/.mcp.json
 
 # Misc
 *.log

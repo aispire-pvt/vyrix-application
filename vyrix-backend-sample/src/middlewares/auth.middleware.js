@@ -1,34 +1,30 @@
-const jwt = require("jsonwebtoken")
-const userModel = require("../models/user.models")
+const jwt       = require("jsonwebtoken");
+const userModel = require("../models/user.models");
 
-async function authUser(req,res,next)
-{
-    const token= req.cookies.token;
-    if(!token)
-    {
-        return res.status(403).json({
-            message:"Unauthorized"
-        });
+// Accepts a JWT from either:
+//   - httpOnly cookie (web / fallback)
+//   - Authorization: Bearer <token> header (Electron)
+async function authUser(req, res, next) {
+    let token = req.cookies.token;
+
+    if (!token) {
+        const header = req.headers.authorization || "";
+        if (header.startsWith("Bearer ")) token = header.slice(7);
     }
 
-    try{
-        const decoded= jwt.verify(token,process.env.JWT_SECRET)
-        req.user=decoded
+    if (!token) {
+        return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    try {
+        req.user = jwt.verify(token, process.env.JWT_SECRET);
         next();
-    }catch(error)
-    {
-        console.error(error);
-        return res.status(403).json({
-            message:"You seems to be unauthorized"
-        });
+    } catch {
+        return res.status(403).json({ message: "Unauthorized" });
     }
 }
 
-// Blocks app data access until the user has verified their email AND finished
-// onboarding. Use AFTER authUser. Returns 412 so the frontend can route the
-// user back to onboarding rather than logging them out.
-async function requireOnboarded(req, res, next)
-{
+async function requireOnboarded(req, res, next) {
     try {
         const user = await userModel
             .findById(req.user.id)
@@ -38,8 +34,8 @@ async function requireOnboarded(req, res, next)
         }
         if (!user.emailVerified || !user.onboardingCompleted) {
             return res.status(412).json({
-                message: "Please verify your email and complete onboarding",
-                emailVerified: user.emailVerified,
+                message:             "Please verify your email and complete onboarding",
+                emailVerified:       user.emailVerified,
                 onboardingCompleted: user.onboardingCompleted,
             });
         }
@@ -50,4 +46,4 @@ async function requireOnboarded(req, res, next)
     }
 }
 
-module.exports={authUser, requireOnboarded}
+module.exports = { authUser, requireOnboarded };
