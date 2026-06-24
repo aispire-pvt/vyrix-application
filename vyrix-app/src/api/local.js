@@ -14,3 +14,4 @@ export const folders     = w.folders
 export const todos       = w.todos
 export const attachments = w.attachments
 export const flows       = w.flows
+export const ai          = w.ai

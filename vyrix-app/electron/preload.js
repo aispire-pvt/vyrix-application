@@ -70,9 +70,27 @@ contextBridge.exposeInMainWorld("vyrix", {
         drain: () => ipcRenderer.invoke("sync:drain"),
     },
 
+    // ── AI ────────────────────────────────────────────────────────────────────
+    ai: {
+        health:                   ()                         => ipcRenderer.invoke("ai:health"),
+        getOrCreateConversation:  (params)                   => ipcRenderer.invoke("ai:getOrCreateConversation", params),
+        getConversation:          (id)                       => ipcRenderer.invoke("ai:getConversation", id),
+        listConversations:        (projectId)                => ipcRenderer.invoke("ai:listConversations", projectId),
+        deleteConversation:       (id)                       => ipcRenderer.invoke("ai:deleteConversation", id),
+        sendMessage:              (conversationId, message, opts) => ipcRenderer.invoke("ai:sendMessage", conversationId, message, opts),
+        streamMessage:            (conversationId, message, opts) => ipcRenderer.invoke("ai:streamMessage", conversationId, message, opts),
+    },
+
     // ── App events (renderer listens for these) ───────────────────────────────
     on: (channel, fn) => {
-        const allowed = ["app:ready", "auth:deepLink"];
+        const allowed = [
+            "app:ready",
+            "auth:deepLink",
+            "ai:stream:start",
+            "ai:stream:chunk",
+            "ai:stream:done",
+            "ai:stream:error",
+        ];
         if (allowed.includes(channel)) ipcRenderer.on(channel, fn);
     },
     off: (channel, fn) => ipcRenderer.removeListener(channel, fn),

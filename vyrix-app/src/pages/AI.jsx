@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
@@ -20,7 +20,7 @@ const SUGGESTIONS = [
   'Lets review our ongoing projects',
 ]
 
-// AI research-assistant page (Phase 9). Level 1: shell + gradient + greeting.
+// AI research-assistant page — wired to Ollama via Electron IPC.
 export default function AI() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
@@ -28,7 +28,12 @@ export default function AI() {
   const [isTodoOpen, setIsTodoOpen] = useState(false)
   const [inputText, setInputText] = useState('')
   const [messages, setMessages] = useState([])
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [ollamaStatus, setOllamaStatus] = useState(null) // null | { ok, message }
+  const [attachedFile, setAttachedFile] = useState(null) // { name, content }
+  const conversationIdRef = useRef(null)
   const inputRef = useRef(null)
+  const fileInputRef = useRef(null)
   const messagesEndRef = useRef(null)
 
   const handleSuggestionClick = (text) => {
@@ -36,36 +41,180 @@ export default function AI() {
     setTimeout(() => inputRef.current?.focus(), 50)
   }
 
-  // Mock AI reply (UI-only — real model wired in a future phase).
-  const mockResponse = async () => {
-    await new Promise((r) => setTimeout(r, 800))
-    const responses = [
-      "That's an interesting research direction. Let me help you explore that further.",
-      'Based on your research context, here are some key areas to investigate. Start with recent peer-reviewed papers and cross-reference with your existing project notes.',
-      'I can help you synthesize information on that topic. What specific aspect interests you most — methodology, findings, or related literature?',
-      'Great question for your research. Consider exploring peer-reviewed sources and citation networks to find connected work.',
-      "Noted! Let's break this down systematically. First, define the scope, then identify key sources, and finally structure your synthesis.",
-    ]
-    return responses[Math.floor(Math.random() * responses.length)]
+  // Opens the file picker; reads text-based files and attaches them to the next message.
+  const handleAttachClick = () => {
+    fileInputRef.current?.click()
   }
 
-  const handleSubmit = async () => {
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Reset so the same file can be re-selected
+    e.target.value = ''
+
+    const isText = file.type.startsWith('text/') ||
+      /\.(txt|md|csv|json|js|ts|jsx|tsx|py|java|c|cpp|h|html|css|xml|yaml|yml|log)$/i.test(file.name)
+
+    if (!isText) {
+      // For non-text files just attach the name as context label
+      setAttachedFile({ name: file.name, content: null })
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const content = ev.target.result?.slice(0, 8000) // cap at 8k chars
+      setAttachedFile({ name: file.name, content })
+    }
+    reader.readAsText(file)
+  }
+
+  // Appends an AI error bubble and resets streaming state.
+  const showError = useCallback((text) => {
+    setMessages((prev) => {
+      // Replace streaming placeholder if one exists, otherwise append.
+      const lastIsStreaming = prev.length > 0 && prev[prev.length - 1].streaming
+      if (lastIsStreaming) {
+        return [...prev.slice(0, -1), { role: 'ai', text }]
+      }
+      return [...prev, { role: 'ai', text }]
+    })
+    setIsStreaming(false)
+  }, [])
+
+  // Load existing conversation + history on mount (once user is ready).
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await window.vyrix.ai.getOrCreateConversation({ scope: 'workspace' })
+      if (!res?.conversation?.id) return
+      conversationIdRef.current = res.conversation.id
+
+      // If there are existing messages, fetch and display them.
+      if (res.conversation.messageCount > 0) {
+        const detail = await window.vyrix.ai.getConversation(res.conversation.id)
+        if (detail?.messages?.length > 0) {
+          setMessages(
+            detail.messages.map((m) => ({ role: m.role === 'assistant' ? 'ai' : m.role, text: m.content }))
+          )
+        }
+      }
+    } catch { /* silently ignore */ }
+  }, [])
+
+  // Ensure a workspace conversation exists before the first message.
+  const ensureConversation = useCallback(async () => {
+    if (conversationIdRef.current) return conversationIdRef.current
+    try {
+      const res = await window.vyrix.ai.getOrCreateConversation({ scope: 'workspace' })
+      if (res?.conversation?.id) {
+        conversationIdRef.current = res.conversation.id
+        return res.conversation.id
+      }
+      return null
+    } catch {
+      return null
+    }
+  }, [])
+
+  const handleSubmit = useCallback(async () => {
     const text = inputText.trim()
-    if (!text) return
+    if ((!text && !attachedFile) || isStreaming) return
     setInputText('')
 
-    // Add the user message + a typing indicator.
-    setMessages((prev) => [...prev, { role: 'user', text }])
-    setMessages((prev) => [...prev, { role: 'ai', text: '...', typing: true }])
+    let convId
+    try {
+      convId = await ensureConversation()
+    } catch {
+      convId = null
+    }
 
-    // Replace the typing indicator with the mock response.
-    const response = await mockResponse(text)
-    setMessages((prev) =>
-      prev.map((m, i) =>
-        i === prev.length - 1 && m.typing ? { role: 'ai', text: response } : m
+    if (!convId) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'ai', text: 'Could not start a conversation. Make sure Ollama is running (ollama serve).' },
+      ])
+      return
+    }
+
+    // Build the message sent to the model — include file content if attached.
+    const currentFile = attachedFile
+    let modelMessage  = text
+    let displayText   = text
+    if (currentFile) {
+      displayText   = `📎 ${currentFile.name}${text ? `  ${text}` : ''}`
+      modelMessage  = currentFile.content
+        ? `[Attached file: ${currentFile.name}]\n\`\`\`\n${currentFile.content}\n\`\`\`\n\n${text}`
+        : `[Attached file: ${currentFile.name}]\n\n${text}`
+      setAttachedFile(null)
+    }
+
+    // Append user message + streaming placeholder.
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', text: displayText },
+      { role: 'ai', text: '', typing: true, streaming: true },
+    ])
+    setIsStreaming(true)
+
+    let streamRes
+    try {
+      streamRes = await window.vyrix.ai.streamMessage(convId, modelMessage)
+    } catch (err) {
+      showError(err?.message || 'Failed to contact AI backend.')
+      return
+    }
+
+    if (streamRes?.error) {
+      showError(streamRes.error)
+      return
+    }
+
+    const requestId = streamRes?.requestId
+    let accumulated = ''
+
+    const cleanup = () => {
+      window.vyrix.off('ai:stream:chunk', onChunk)
+      window.vyrix.off('ai:stream:done',  onDone)
+      window.vyrix.off('ai:stream:error', onError)
+    }
+
+    function onChunk(_, payload) {
+      if (payload.requestId !== requestId) return
+      accumulated += payload.delta
+      const snapshot = accumulated
+      setMessages((prev) =>
+        prev.map((m, i) =>
+          i === prev.length - 1 && m.streaming
+            ? { role: 'ai', text: snapshot, typing: false, streaming: true }
+            : m
+        )
       )
-    )
-  }
+    }
+
+    function onDone(_, payload) {
+      if (payload.requestId !== requestId) return
+      cleanup()
+      const finalText = payload.message?.content || accumulated
+      setMessages((prev) =>
+        prev.map((m, i) =>
+          i === prev.length - 1 && m.streaming
+            ? { role: 'ai', text: finalText }
+            : m
+        )
+      )
+      setIsStreaming(false)
+    }
+
+    function onError(_, payload) {
+      if (payload.requestId !== requestId) return
+      cleanup()
+      showError(payload.error || 'An error occurred while generating a response.')
+    }
+
+    window.vyrix.on('ai:stream:chunk', onChunk)
+    window.vyrix.on('ai:stream:done',  onDone)
+    window.vyrix.on('ai:stream:error', onError)
+  }, [inputText, attachedFile, isStreaming, ensureConversation, showError])
 
   // Auto-scroll to the newest message.
   useEffect(() => {
@@ -79,28 +228,26 @@ export default function AI() {
     }
   }, [loading])
 
+  // Load user, then load chat history and check Ollama health
   useEffect(() => {
     let active = true
-    api
-      .get('/api/auth/me')
+    window.vyrix.getMe()
       .then((res) => {
         if (!active) return
-        setUser(res.data.user)
+        setUser(res?.user || { firstName: '', profilePic: null })
         setLoading(false)
+        // Load history and health check after user is confirmed
+        loadHistory()
+        window.vyrix.ai.health()
+          .then((r) => { if (active) setOllamaStatus(r) })
+          .catch(() => { if (active) setOllamaStatus({ ok: false, message: 'Cannot reach Ollama. Run: ollama serve' }) })
       })
-      .catch((err) => {
+      .catch(() => {
         if (!active) return
-        if (err.response?.status === 401 || err.response?.status === 403) {
-          navigate('/login')
-        } else {
-          setUser({ firstName: '', profilePic: null })
-          setLoading(false)
-        }
+        navigate('/login')
       })
-    return () => {
-      active = false
-    }
-  }, [navigate])
+    return () => { active = false }
+  }, [navigate, loadHistory])
 
   if (loading) {
     return (
@@ -123,6 +270,14 @@ export default function AI() {
           activeTabTitle="AI"
           onCloseActiveTab={() => navigate('/home')}
         />
+
+        {/* Ollama status banner — only shown when not OK */}
+        {ollamaStatus && !ollamaStatus.ok && (
+          <div className="z-50 flex items-center gap-2 border-b border-red-900/40 bg-red-950/60 px-5 py-2 text-[12px] text-red-300">
+            <span className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-red-400" />
+            <span>{ollamaStatus.message}</span>
+          </div>
+        )}
 
         {/* Content area */}
         <div className="relative flex-1 overflow-hidden bg-black">
@@ -193,6 +348,15 @@ export default function AI() {
             </div>
           )}
 
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept=".txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.java,.c,.cpp,.h,.html,.css,.xml,.yaml,.yml,.log,text/*"
+            onChange={handleFileChange}
+          />
+
           {/* Suggestions + Input container — bottom of the content area */}
           <div className="absolute bottom-0 left-[18px] right-[18px] z-10 pb-4">
             {/* TOP SECTION — 2 suggestions; only before the first message */}
@@ -236,14 +400,30 @@ export default function AI() {
                 </button>
               )}
 
+              {/* Attached file pill — shown above input bar when a file is selected */}
+              {attachedFile && (
+                <div className="flex items-center gap-2 px-[20px] py-[8px]" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                  <span className="text-[12px] text-[#a0a0a0]">📎</span>
+                  <span className="max-w-[300px] truncate text-[12px] text-[#c0c0c0]">{attachedFile.name}</span>
+                  <button
+                    onClick={() => setAttachedFile(null)}
+                    className="ml-1 text-[14px] leading-none text-[#8d8d97] hover:text-white"
+                    title="Remove attachment"
+                  >×</button>
+                </div>
+              )}
+
               {/* Input bar row */}
               <div className="flex h-[69px] items-center gap-0 px-0">
                 {/* Paperclip icon — left */}
-                <div className="flex h-full w-[66px] flex-shrink-0 items-center justify-center">
+                <div
+                  className="flex h-full w-[66px] flex-shrink-0 cursor-pointer items-center justify-center"
+                  onClick={handleAttachClick}
+                >
                   <img
                     src={imgPaperclip1}
                     alt="attach"
-                    className="h-[28px] w-[28px] cursor-pointer object-cover opacity-80 transition-opacity hover:opacity-100"
+                    className="h-[28px] w-[28px] object-cover opacity-80 transition-opacity hover:opacity-100"
                   />
                 </div>
 
@@ -273,9 +453,9 @@ export default function AI() {
                 <div className="flex h-full w-[69px] flex-shrink-0 items-center justify-center">
                   <button
                     onClick={handleSubmit}
-                    disabled={!inputText.trim()}
+                    disabled={(!inputText.trim() && !attachedFile) || isStreaming}
                     className={`relative h-[45px] w-[45px] flex-shrink-0 transition-all ${
-                      inputText.trim()
+                      (inputText.trim() || attachedFile) && !isStreaming
                         ? 'cursor-pointer opacity-100 hover:scale-105'
                         : 'cursor-default opacity-50'
                     }`}

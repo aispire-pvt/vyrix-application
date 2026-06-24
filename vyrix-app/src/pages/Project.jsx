@@ -306,7 +306,15 @@ export default function Project() {
                       <div
                         key={att.id}
                         className="group flex w-[200px] cursor-pointer flex-col gap-2"
-                        onClick={() => att.type === 'document' && att.docId && navigate(`/doc/${att.docId}?projectId=${id}`)}
+                        onClick={() => {
+                          if (att.type === 'document' && att.docId) {
+                            navigate(`/doc/${att.docId}?projectId=${id}&attId=${att.id}`)
+                          } else if (att.type === 'link' && att.url) {
+                            window.open(att.url, '_blank')
+                          } else if ((att.type === 'canva' || att.type === 'figma') && att.url) {
+                            window.open(att.url, '_blank')
+                          }
+                        }}
                       >
                         <div className="relative h-[130px] w-full transition-transform group-hover:-translate-y-0.5">
                           <DocumentCover att={att} />

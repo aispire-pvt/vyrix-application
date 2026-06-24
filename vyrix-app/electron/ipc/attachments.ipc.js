@@ -34,8 +34,8 @@ function readAttachments(projectId) {
 
 function writeAttachments(projectId, list) {
     getDB()
-        .prepare(`UPDATE projects SET attachments = ?, updated_at = ? WHERE id = ?`)
-        .run(JSON.stringify(list), new Date().toISOString(), projectId);
+        .prepare(`UPDATE projects SET attachments = ? WHERE id = ?`)
+        .run(JSON.stringify(list), projectId);
 }
 
 function readFlows(projectId) {

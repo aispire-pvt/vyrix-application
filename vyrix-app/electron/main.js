@@ -9,6 +9,7 @@ const todosIpc         = require("./ipc/todos.ipc");
 const attachmentsIpc   = require("./ipc/attachments.ipc");
 const syncIpc          = require("./ipc/sync.ipc");
 const onboardingIpc    = require("./ipc/onboarding.ipc");
+const aiIpc            = require("./ipc/ai.ipc");
 
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 
@@ -76,6 +77,7 @@ app.whenReady().then(() => {
     attachmentsIpc.register(ipcMain);
     syncIpc.register(ipcMain);
     onboardingIpc.register(ipcMain);
+    aiIpc.register(ipcMain);
 
     win = new BrowserWindow({
         show:      false,

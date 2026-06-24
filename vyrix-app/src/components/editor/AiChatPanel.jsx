@@ -1,18 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import aiIcon from '../../assets/editor/ai.png'
 
-// Demo conversation so the panel matches the Figma design out of the box.
-const INITIAL_MESSAGES = [
-  { role: 'user', text: 'Help me write this document' },
-  { role: 'assistant', text: 'Lets get started as i can see ...' },
-]
-
-// Right-side AI chat panel (Figma 288:1755 / 288:2234). UI only — the real model
-// is wired in later (see sendMessage's TODO).
-// Props: { onClose, glass } — glass = translucent glassmorphic panel (project page)
-export default function AiChatPanel({ onClose, glass = false }) {
-  const [messages, setMessages] = useState(INITIAL_MESSAGES)
+// Right-side AI chat panel (Figma 288:1755 / 288:2234).
+// Wired to Ollama via Electron IPC with streaming support.
+// Props: { onClose, glass, projectId, docContext }
+//   glass      — glassmorphic variant used on the Project page
+//   projectId  — scope conversations to the current project (optional)
+//   docContext — extra text prepended as context for the editor page (optional)
+export default function AiChatPanel({ onClose, glass = false, projectId, docContext }) {
+  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const conversationIdRef = useRef(null)
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -20,24 +19,119 @@ export default function AiChatPanel({ onClose, glass = false }) {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  const sendMessage = () => {
-    const text = input.trim()
-    if (!text) return
-    setMessages((m) => [...m, { role: 'user', text }])
-    setInput('')
+  // Ensure a conversation exists (project-scoped if projectId provided).
+  const ensureConversation = useCallback(async () => {
+    if (conversationIdRef.current) return conversationIdRef.current
+    const params = projectId
+      ? { projectId, scope: 'project', title: 'Project Chat' }
+      : { scope: 'workspace', title: 'Document Chat' }
+    const res = await window.vyrix.ai.getOrCreateConversation(params)
+    if (res?.conversation?.id) {
+      conversationIdRef.current = res.conversation.id
+      return res.conversation.id
+    }
+    return null
+  }, [projectId])
 
-    // TODO(ai): replace this placeholder with a real call to the AI backend
-    // (POST the message + document context, stream the reply into a message).
-    setTimeout(() => {
+  const showPanelError = useCallback((text) => {
+    setMessages((m) => {
+      const lastStreaming = m.length > 0 && m[m.length - 1].streaming
+      if (lastStreaming) return [...m.slice(0, -1), { role: 'assistant', text }]
+      return [...m, { role: 'assistant', text }]
+    })
+    setIsStreaming(false)
+  }, [])
+
+  const sendMessage = useCallback(async () => {
+    const text = input.trim()
+    if (!text || isStreaming) return
+
+    let convId
+    try {
+      convId = await ensureConversation()
+    } catch {
+      convId = null
+    }
+
+    if (!convId) {
       setMessages((m) => [
         ...m,
-        {
-          role: 'assistant',
-          text: 'AI is not connected yet — responses will appear here once the model is wired in.',
-        },
+        { role: 'assistant', text: 'Could not connect to AI. Make sure Ollama is running (ollama serve).' },
       ])
-    }, 500)
-  }
+      return
+    }
+
+    // Build final message — optionally prepend doc context on first message.
+    const fullText = docContext && messages.length === 0
+      ? `Context:\n${docContext}\n\n${text}`
+      : text
+
+    setMessages((m) => [
+      ...m,
+      { role: 'user', text },
+      { role: 'assistant', text: '', streaming: true },
+    ])
+    setInput('')
+    setIsStreaming(true)
+
+    let streamRes
+    try {
+      streamRes = await window.vyrix.ai.streamMessage(convId, fullText)
+    } catch (err) {
+      showPanelError(err?.message || 'Failed to contact AI backend.')
+      return
+    }
+
+    if (streamRes?.error) {
+      showPanelError(streamRes.error)
+      return
+    }
+
+    const requestId = streamRes?.requestId
+    let accumulated = ''
+
+    const cleanup = () => {
+      window.vyrix.off('ai:stream:chunk', onChunk)
+      window.vyrix.off('ai:stream:done',  onDone)
+      window.vyrix.off('ai:stream:error', onError)
+    }
+
+    function onChunk(_, payload) {
+      if (payload.requestId !== requestId) return
+      accumulated += payload.delta
+      const snapshot = accumulated
+      setMessages((m) =>
+        m.map((msg, i) =>
+          i === m.length - 1 && msg.streaming
+            ? { role: 'assistant', text: snapshot, streaming: true }
+            : msg
+        )
+      )
+    }
+
+    function onDone(_, payload) {
+      if (payload.requestId !== requestId) return
+      cleanup()
+      setMessages((m) =>
+        m.map((msg, i) =>
+          i === m.length - 1 && msg.streaming
+            ? { role: 'assistant', text: payload.message?.content || accumulated }
+            : msg
+        )
+      )
+      setIsStreaming(false)
+    }
+
+    function onError(_, payload) {
+      if (payload.requestId !== requestId) return
+      cleanup()
+      showPanelError(payload.error || 'An error occurred while generating a response.')
+    }
+
+    window.vyrix.on('ai:stream:chunk', onChunk)
+    window.vyrix.on('ai:stream:done',  onDone)
+    window.vyrix.on('ai:stream:error', onError)
+  }, [input, isStreaming, ensureConversation, docContext, messages.length, showPanelError])
 
   return (
     <div
@@ -64,6 +158,11 @@ export default function AiChatPanel({ onClose, glass = false }) {
 
       {/* Messages */}
       <div ref={scrollRef} className="dark-scroll flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-3">
+        {messages.length === 0 && (
+          <p className="mt-4 text-center font-sf text-[12px] text-[#8d8d97]">
+            Ask anything about your research…
+          </p>
+        )}
         {messages.map((m, i) =>
           m.role === 'user' ? (
             <div
@@ -77,7 +176,15 @@ export default function AiChatPanel({ onClose, glass = false }) {
               key={i}
               className="max-w-[88%] self-start rounded-[11px] bg-[#dcdcdc] px-4 py-3 font-sf text-[13px] font-[510] leading-snug text-black"
             >
-              {m.text}
+              {m.streaming && !m.text ? (
+                <span className="flex items-center gap-1">
+                  <span className="h-[5px] w-[5px] animate-bounce rounded-full bg-[#555]" style={{ animationDelay: '0ms' }} />
+                  <span className="h-[5px] w-[5px] animate-bounce rounded-full bg-[#555]" style={{ animationDelay: '150ms' }} />
+                  <span className="h-[5px] w-[5px] animate-bounce rounded-full bg-[#555]" style={{ animationDelay: '300ms' }} />
+                </span>
+              ) : (
+                m.text
+              )}
             </div>
           )
         )}
@@ -109,8 +216,9 @@ export default function AiChatPanel({ onClose, glass = false }) {
           />
           <button
             onClick={sendMessage}
+            disabled={!input.trim() || isStreaming}
             title="Send"
-            className="flex h-[36px] w-[36px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.12)] text-white transition-colors hover:bg-[rgba(255,255,255,0.2)]"
+            className={`flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-full border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.12)] text-white transition-colors ${!input.trim() || isStreaming ? 'cursor-default opacity-40' : 'cursor-pointer hover:bg-[rgba(255,255,255,0.2)]'}`}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="19" x2="12" y2="5" />
