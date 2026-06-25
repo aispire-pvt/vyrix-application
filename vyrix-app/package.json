@@ -2,7 +2,7 @@
   "name": "vyrix-app",
   "version": "0.1.0",
   "description": "Vyrix — structured research workspace for design students",
-  "main": "dist/main/main.js",
+  "main": "electron/main.js",
   "type": "commonjs",
   "author": {
     "name": "Aispire Private Limited",
@@ -10,12 +10,12 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "vite build",
     "start": "electron .",
-    "dist": "electron-vite build && electron-builder",
-    "dist:win": "electron-vite build && electron-builder --win",
-    "dist:mac": "electron-vite build && electron-builder --mac",
-    "dist:linux": "electron-vite build && electron-builder --linux"
+    "dist": "vite build && electron-builder",
+    "dist:win": "vite build && electron-builder --win",
+    "dist:mac": "vite build && electron-builder --mac",
+    "dist:linux": "vite build && electron-builder --linux"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",
@@ -55,6 +55,7 @@
     },
     "files": [
       "dist/**/*",
+      "electron/**/*",
       "node_modules/**/*",
       "package.json"
     ],
