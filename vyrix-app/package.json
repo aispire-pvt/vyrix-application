@@ -55,6 +55,7 @@
     },
     "files": [
       "dist/**/*",
+      "node_modules/**/*",
       "package.json"
     ],
     "asar": true,

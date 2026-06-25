@@ -8,6 +8,12 @@ export default defineConfig({
             outDir: "dist/main",
             rollupOptions: {
                 input: resolve("electron/main.js"),
+                external: [
+                    "electron",
+                    "better-sqlite3",
+                    "electron-store",
+                    "electron-updater",
+                ],
             },
         },
     },
