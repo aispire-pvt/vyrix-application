@@ -61,11 +61,10 @@
     "asarUnpack": [
       "node_modules/better-sqlite3/**"
     ],
+    "artifactName": "${productName}-${version}.${ext}",
     "win": {
       "target": "nsis",
-      "icon": "build/icon.ico",
-      "artifactName": "Vyrix-Setup-${version}.${ext}",
-      "publisherName": ["Aispire Private Limited"]
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -78,7 +77,6 @@
     "mac": {
       "target": "dmg",
       "icon": "build/icon.icns",
-      "artifactName": "Vyrix-${version}.${ext}",
       "category": "public.app-category.productivity",
       "darkModeSupport": true
     },
@@ -88,7 +86,6 @@
     "linux": {
       "target": "AppImage",
       "icon": "build/icon.png",
-      "artifactName": "Vyrix-${version}.${ext}",
       "category": "Office"
     },
     "publish": {
