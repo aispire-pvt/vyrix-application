@@ -8,8 +8,7 @@ export default function Tutorials() {
     <TutorialsLayout
       linkLabel="Skip"
       linkColorClass="text-[#a3a3a3]"
-      // Skip the tutorial — placeholder advances to the next slide until the app home exists.
-      onLinkClick={() => navigate('/tutorials/next')}
+      onLinkClick={() => navigate('/home')}
     />
   )
 }
