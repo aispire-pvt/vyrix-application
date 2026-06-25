@@ -17,15 +17,15 @@ app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 
 // ponytail: in-memory rate limit, single-instance only; swap to redis-rate-limit if scaling
-const _rl = new Map();
 function rateLimit(max, windowMs) {
+    const map = new Map();
     return (req, res, next) => {
         const key = req.ip;
         const now = Date.now();
-        const e = _rl.get(key) || { n: 0, t: now };
+        const e = map.get(key) || { n: 0, t: now };
         if (now - e.t > windowMs) { e.n = 0; e.t = now; }
         e.n++;
-        _rl.set(key, e);
+        map.set(key, e);
         if (e.n > max) return res.status(429).json({ success: false, message: "Too many requests, please try again later" });
         next();
     };

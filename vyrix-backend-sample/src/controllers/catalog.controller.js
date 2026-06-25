@@ -1,10 +1,10 @@
 const { createClient } = require("@supabase/supabase-js");
 
+// ponytail: lazy singleton — Supabase client is reused across requests
+let _supabase;
 function getSupabase() {
-    return createClient(
-        process.env.SUPABASE_URL,
-        process.env.SUPABASE_SERVICE_KEY
-    );
+    if (!_supabase) _supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    return _supabase;
 }
 
 // POST /api/catalog/upsert
