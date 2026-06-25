@@ -11,6 +11,7 @@ const attachmentsIpc   = require("./ipc/attachments.ipc");
 const syncIpc          = require("./ipc/sync.ipc");
 const onboardingIpc    = require("./ipc/onboarding.ipc");
 const aiIpc            = require("./ipc/ai.ipc");
+const aiSetupIpc       = require("./ipc/ai-setup.ipc");
 
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
 
@@ -119,6 +120,7 @@ app.whenReady().then(() => {
     syncIpc.register(ipcMain);
     onboardingIpc.register(ipcMain);
     aiIpc.register(ipcMain);
+    aiSetupIpc.register(ipcMain);
     createWindow();
 
     // Check for updates 5s after launch so the window is ready

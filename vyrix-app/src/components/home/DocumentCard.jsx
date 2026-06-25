@@ -7,8 +7,8 @@
 import { getCoverImage } from '../../utils/coverImages'
 
 const SIZES = {
-  large: 'w-[339px] h-[191px]',
-  small: 'w-[266px] h-[166px]',
+  large: 'w-[260px] h-[148px]',
+  small: 'w-[200px] h-[125px]',
 }
 
 function HoverButton({ children, label }) {
@@ -73,14 +73,14 @@ export default function DocumentCard({
 
       {/* Label below */}
       <p
-        className={`mt-2 text-[16px] font-[510] ${
+        className={`mt-1.5 text-[13px] font-[510] ${
           isLarge ? 'text-white' : 'text-[#d5d5d5]'
         }`}
       >
         {title || 'Untitled'}
       </p>
       {isLarge && timestamp && (
-        <p className="text-[12px] font-normal text-[#d5d5d5]">{timestamp}</p>
+        <p className="text-[11px] font-normal text-[#d5d5d5]">{timestamp}</p>
       )}
     </div>
   )

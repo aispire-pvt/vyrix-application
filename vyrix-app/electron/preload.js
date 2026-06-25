@@ -85,6 +85,11 @@ contextBridge.exposeInMainWorld("vyrix", {
         deleteConversation:       (id)                       => ipcRenderer.invoke("ai:deleteConversation", id),
         sendMessage:              (conversationId, message, opts) => ipcRenderer.invoke("ai:sendMessage", conversationId, message, opts),
         streamMessage:            (conversationId, message, opts) => ipcRenderer.invoke("ai:streamMessage", conversationId, message, opts),
+        setup: {
+            status:     () => ipcRenderer.invoke("ai:setup:status"),
+            install:    () => ipcRenderer.invoke("ai:setup:install"),
+            pullModel:  () => ipcRenderer.invoke("ai:setup:pullModel"),
+        },
     },
 
     // ── App events (renderer listens for these) ───────────────────────────────
@@ -96,6 +101,7 @@ contextBridge.exposeInMainWorld("vyrix", {
             "ai:stream:chunk",
             "ai:stream:done",
             "ai:stream:error",
+            "ai:setup:progress",
         ];
         if (allowed.includes(channel)) ipcRenderer.on(channel, fn);
     },

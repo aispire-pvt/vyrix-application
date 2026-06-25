@@ -23,29 +23,29 @@ export default function GreetingHeader({ firstName, docs = [], onOpenDoc, onMove
         }}
       />
 
-      <div className="relative z-10 pl-[39px] pt-[58px]">
+      <div className="relative z-10 pl-[39px] pt-[32px]">
         {/* Greeting */}
-        <h1 className="font-unbounded text-[40px] font-medium leading-tight text-[#e7e7e7]">
+        <h1 className="font-unbounded text-[28px] font-medium leading-tight text-[#e7e7e7]">
           Hi {firstName || 'there'}!
           <br />
           What are you up to?
         </h1>
 
         {/* Recent Activity */}
-        <p className="mb-4 mt-[70px] text-[20px] font-[590] text-[#d5d5d5]">
+        <p className="mb-3 mt-[36px] text-[15px] font-[590] text-[#d5d5d5]">
           Recent Activity
         </p>
 
         {recent.length === 0 ? (
-          <div className="flex h-[191px] w-full max-w-[1416px] flex-col items-center justify-center gap-3 rounded-[20px] border border-dashed border-[rgba(178,197,242,0.15)]">
-            <div className="text-[28px]">📄</div>
-            <p className="text-[14px] text-[#4a4a5a]">No documents yet</p>
-            <p className="text-[12px] text-[#3a3a4a]">
+          <div className="flex h-[148px] w-full max-w-[1416px] flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed border-[rgba(178,197,242,0.15)]">
+            <div className="text-[22px]">📄</div>
+            <p className="text-[12px] text-[#4a4a5a]">No documents yet</p>
+            <p className="text-[11px] text-[#3a3a4a]">
               Hit "Create new project" above to get started
             </p>
           </div>
         ) : (
-          <div className="flex gap-[18px]">
+          <div className="flex gap-[14px]">
             {recent.map((doc) => (
               <DocumentCard
                 key={doc.id}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
+import AISetupModal from '../components/ai/AISetupModal'
 
 // AI Page assets — GRADIENT 1 (the signature dark blue-purple gradient).
 const imgVector15 = 'https://www.figma.com/api/mcp/asset/5e9d9fff-f342-4fc8-9935-fdf30f756d9d'
@@ -30,6 +31,7 @@ export default function AI() {
   const [messages, setMessages] = useState([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [ollamaStatus, setOllamaStatus] = useState(null) // null | { ok, message }
+  const [showSetup, setShowSetup] = useState(false)
   const [attachedFile, setAttachedFile] = useState(null) // { name, content }
   const conversationIdRef = useRef(null)
   const inputRef = useRef(null)
@@ -271,33 +273,29 @@ export default function AI() {
           onCloseActiveTab={() => navigate('/home')}
         />
 
-        {/* Ollama status banner — only shown when not OK */}
+        {/* Ollama status banner — offers one-click setup */}
         {ollamaStatus && !ollamaStatus.ok && (
-          <div className="z-50 flex flex-col gap-2 border-b border-red-900/40 bg-red-950/60 px-5 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-red-400" />
-                <span className="font-sf text-[12px] font-bold text-red-300">AI is offline — Ollama is not running</span>
-              </div>
-              <button
-                onClick={() => {
-                  setOllamaStatus(null)
-                  window.vyrix.ai.health()
-                    .then((r) => setOllamaStatus(r))
-                    .catch(() => setOllamaStatus({ ok: false, message: 'Still unreachable.' }))
-                }}
-                className="rounded-lg border border-red-700/50 px-3 py-1 font-sf text-[11px] text-red-300 hover:bg-red-900/40"
-              >
-                Retry
-              </button>
+          <div className="z-50 flex items-center justify-between border-b border-[rgba(178,197,242,0.15)] bg-[rgba(178,197,242,0.06)] px-5 py-3">
+            <div className="flex items-center gap-2">
+              <span className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-[#b2c5f2]" />
+              <span className="font-sf text-[12px] font-bold text-white">AI isn't set up yet — install in one click</span>
             </div>
-            <div className="font-sf text-[11px] text-red-400/80">
-              To start Ollama, open a terminal and run:{' '}
-              <code className="rounded bg-red-900/40 px-2 py-0.5 font-mono text-red-200">ollama serve</code>
-              {' '}— if Ollama is not installed, download it from{' '}
-              <span className="text-red-200 underline cursor-pointer" onClick={() => window.vyrix.loginGoogle && window.open?.('https://ollama.com')}>ollama.com</span>
-            </div>
+            <button
+              onClick={() => setShowSetup(true)}
+              className="rounded-lg bg-[#b2c5f2] px-4 py-1.5 font-sf text-[12px] font-bold text-black hover:bg-[#a0b5e8]"
+            >
+              Set up AI
+            </button>
           </div>
+        )}
+
+        {showSetup && (
+          <AISetupModal
+            onClose={() => setShowSetup(false)}
+            onDone={() => {
+              window.vyrix.ai.health().then((r) => setOllamaStatus(r))
+            }}
+          />
         )}
 
         {/* Content area */}

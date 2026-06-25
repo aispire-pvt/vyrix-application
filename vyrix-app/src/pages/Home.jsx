@@ -71,7 +71,7 @@ export default function Home() {
       <div className="relative flex flex-1 flex-col overflow-hidden">
         <Navbar onToggleTodo={() => setIsTodoOpen((v) => !v)} isTodoOpen={isTodoOpen} />
 
-        <div className="flex-1 overflow-y-auto bg-black px-[20px] pb-[20px]">
+        <div className="flex-1 overflow-hidden bg-black px-[20px] pb-[20px]">
           <GreetingHeader
             firstName={user?.firstName}
             docs={docs}
@@ -81,7 +81,7 @@ export default function Home() {
             }
           />
 
-          <div className="mt-6 flex flex-col gap-6 px-[39px] pb-[48px]">
+          <div className="mt-4 flex flex-col gap-4 px-[39px] pb-[20px]">
             <CreateProjectBar onClick={handleCreateDoc} />
             <ProjectsSection
               folders={folderList}
@@ -92,8 +92,8 @@ export default function Home() {
 
             {recentFiles.length > 0 && (
               <div>
-                <p className="mb-4 text-[20px] font-[590] text-[#d5d5d5]">Recent Files</p>
-                <div className="flex flex-wrap gap-[18px]">
+                <p className="mb-3 text-[15px] font-[590] text-[#d5d5d5]">Recent Files</p>
+                <div className="flex flex-wrap gap-[14px]">
                   {recentFiles.map((doc) => (
                     <DocumentCard
                       key={doc.id}
