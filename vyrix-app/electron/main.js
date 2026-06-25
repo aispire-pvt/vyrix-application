@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
 const path = require("path");
+const { spawn } = require("child_process");
 
 const { initDB }       = require("./ipc/db");
 const authIpc          = require("./ipc/auth.ipc");
@@ -65,7 +66,22 @@ app.on("second-instance", (_, argv) => {
 const firstLaunchUrl = process.argv.find((a) => typeof a === "string" && a.startsWith("vyrix://"));
 if (firstLaunchUrl) pendingDeepLink = { __pendingUrl: firstLaunchUrl };
 
+// Try to start Ollama if it isn't already running. Silently ignored if:
+//   - Ollama isn't installed (ENOENT)
+//   - It's already running (port conflict — Ollama exits immediately)
+//   - macOS/Windows auto-started it at login
+function tryStartOllama() {
+    const proc = spawn("ollama", ["serve"], {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true,
+    });
+    proc.unref(); // don't keep the Electron process alive for Ollama
+    proc.on("error", () => {}); // ENOENT = not installed, silently ignore
+}
+
 app.whenReady().then(() => {
+    tryStartOllama();
     initDB();
     authIpc.register(ipcMain);
     projectsIpc.register(ipcMain);
