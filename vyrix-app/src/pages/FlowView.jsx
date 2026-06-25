@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getMe, projects, flows as flowsApi } from '../api/local'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
+import TodoPanel from '../components/home/TodoPanel'
 
 export default function FlowView() {
   const { id, flowId } = useParams()
@@ -156,6 +157,12 @@ export default function FlowView() {
             </div>
           )}
         </div>
+
+        <TodoPanel
+          isOpen={isTodoOpen}
+          onClose={() => setIsTodoOpen(false)}
+          firstName={user?.firstName}
+        />
       </div>
     </div>
   )

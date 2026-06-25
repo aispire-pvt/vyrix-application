@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { getMe, projects, attachments as attachmentsApi, flows as flowsApi } from '../api/local'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
+import TodoPanel from '../components/home/TodoPanel'
 import SaveIndicator from '../components/editor/SaveIndicator'
 import AddFilesMenu from '../components/project/AddFilesMenu'
 import FlowRepository from '../components/project/FlowRepository'
@@ -361,6 +362,12 @@ export default function Project() {
             </div>
           )}
         </div>
+
+        <TodoPanel
+          isOpen={isTodoOpen}
+          onClose={() => setIsTodoOpen(false)}
+          firstName={user?.firstName}
+        />
       </div>
 
       {!aiOpen && (

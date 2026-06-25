@@ -1,4 +1,5 @@
 import FileTypeIcon from './FileTypeIcon'
+import repoBg from '../../assets/flow/repo-bg.jpeg'
 
 // Project-page Flow Repository panel — a clickable card that opens the overlay.
 // Empty (no files): centred "Flow Repository" title. Once files exist, it shows
@@ -14,15 +15,19 @@ export default function FlowRepository({ flows = [], onOpen }) {
   return (
     <button
       onClick={onOpen}
-      className="relative block min-h-[290px] w-full overflow-hidden rounded-[20px] border border-[rgba(178,197,242,0.12)] bg-[rgba(12,12,24,0.20)] text-left shadow-[1px_4px_7.7px_5px_rgba(0,0,0,0.25)] backdrop-blur-sm transition-colors hover:border-[rgba(178,197,242,0.35)]"
+      className="relative block min-h-[290px] w-full overflow-hidden rounded-[20px] border border-[rgba(178,197,242,0.12)] text-left shadow-[1px_4px_7.7px_5px_rgba(0,0,0,0.25)] transition-colors hover:border-[rgba(178,197,242,0.35)]"
     >
+      {/* Black hole backdrop with dark gradient overlay for legibility */}
+      <img src={repoBg} alt="" className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/70" />
+
       {recentFiles.length === 0 ? (
         /* Empty state — centred title (Figma 298:2929) */
-        <div className="flex h-[290px] items-center justify-center">
-          <p className="font-sf text-[32px] font-bold text-[#d5d5d5]">Flow Repository</p>
+        <div className="relative flex h-[290px] items-center justify-center">
+          <p className="font-sf text-[32px] font-bold text-white drop-shadow-lg">Flow Repository</p>
         </div>
       ) : (
-        <div className="flex h-full min-h-[290px] flex-col p-7">
+        <div className="relative flex h-full min-h-[290px] flex-col p-7">
           {/* Header: title (left) + Recently Uploaded (right) */}
           <div className="flex items-start justify-between">
             <p className="font-sf text-[30px] font-bold text-white">Flow Repository</p>

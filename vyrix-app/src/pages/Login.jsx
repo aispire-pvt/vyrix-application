@@ -46,9 +46,21 @@ export default function Login() {
       window.vyrix.off('auth:deepLink', onDeepLink)
       setLoading(false)
       if (err || !token) { setError(err || 'Google sign-in failed.'); return }
-      window.vyrix.saveToken(token).then((result) => {
+      window.vyrix.saveToken(token).then(async (result) => {
         if (!result?.success) { setError(result?.message || 'Google sign-in failed.'); return }
-        navigate('/home')
+        // Route based on whether the user has completed onboarding + legal acceptance
+        try {
+          const [meRes, legal] = await Promise.all([
+            window.vyrix.getMe(),
+            window.vyrix.legal.status(),
+          ])
+          const u = meRes?.user
+          const legallyDone = legal?.ndaAccepted && legal?.termsAccepted && legal?.privacyAccepted
+          if (!u?.onboardingCompleted || !legallyDone) navigate('/profile')
+          else navigate('/home')
+        } catch {
+          navigate('/profile')
+        }
       })
     }
     window.vyrix.on('auth:deepLink', onDeepLink)

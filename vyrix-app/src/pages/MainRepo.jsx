@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getMe, projects } from '../api/local'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
+import TodoPanel from '../components/home/TodoPanel'
 import FileTypeIcon from '../components/project/FileTypeIcon'
 import { getCoverImage } from '../utils/coverImages'
 
@@ -160,6 +161,12 @@ export default function MainRepo() {
             </div>
           )}
         </div>
+
+        <TodoPanel
+          isOpen={isTodoOpen}
+          onClose={() => setIsTodoOpen(false)}
+          firstName={user?.firstName}
+        />
       </div>
     </div>
   )

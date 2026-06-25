@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
+import TodoPanel from '../components/home/TodoPanel'
 import AISetupModal from '../components/ai/AISetupModal'
 
 // AI Page assets — GRADIENT 1 (the signature dark blue-purple gradient).
@@ -297,6 +298,12 @@ export default function AI() {
             }}
           />
         )}
+
+        <TodoPanel
+          isOpen={isTodoOpen}
+          onClose={() => setIsTodoOpen(false)}
+          firstName={user?.firstName}
+        />
 
         {/* Content area */}
         <div className="relative flex-1 overflow-hidden bg-black">

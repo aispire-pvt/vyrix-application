@@ -6,12 +6,13 @@ export default function ProtectedRoute() {
 
   useEffect(() => {
     let active = true
-    window.vyrix.getMe()
-      .then((res) => {
+    Promise.all([window.vyrix.getMe(), window.vyrix.legal.status()])
+      .then(([res, legal]) => {
         if (!active) return
         const u = res?.user
         if (!u) { setStatus('login'); return }
-        if (!u.emailVerified || !u.onboardingCompleted) setStatus('onboard')
+        const legallyDone = legal?.ndaAccepted && legal?.termsAccepted && legal?.privacyAccepted
+        if (!u.emailVerified || !u.onboardingCompleted || !legallyDone) setStatus('onboard')
         else setStatus('allowed')
       })
       .catch(() => { if (active) setStatus('login') })

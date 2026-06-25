@@ -1,5 +1,5 @@
 import OnboardingSidebar from './OnboardingSidebar'
-import tutorialMedia from '../../assets/flow/doc-cover.png'
+import tutorialMedia from '../../assets/tutorial-preview.png'
 
 const PARAGRAPHS = [
   `Research is hard. Synthesis is harder. You collect data from papers, interviews, spreadsheets, and articles but they live in different tools, scattered across your computer and your mind. When it comes to time to write, you're staring at a blank page, dozens of notes, and a nagging feeling that you're missing the logical thread.`,
@@ -40,9 +40,9 @@ export default function TutorialsLayout({ linkLabel, linkColorClass, onLinkClick
           ))}
         </div>
 
-        {/* Tutorial media — uses the same cover artwork as project cards */}
+        {/* Tutorial preview — annotated home-screen tour */}
         <div className="mt-6 h-[589px] w-[612px] max-w-full overflow-hidden rounded-[11px] bg-vyrix-input">
-          <img src={tutorialMedia} alt="Vyrix tutorial" className="h-full w-full object-cover" />
+          <img src={tutorialMedia} alt="Vyrix tutorial preview" className="h-full w-full object-contain" />
         </div>
       </section>
     </div>

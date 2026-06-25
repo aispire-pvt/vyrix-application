@@ -18,7 +18,7 @@ const { spawn, execFile } = require('child_process')
 
 const OLLAMA_HOST = '127.0.0.1'
 const OLLAMA_PORT = 11434
-const DEFAULT_MODEL = process.env.DEFAULT_CHAT_MODEL || 'llama3.2:3b-instruct'
+const DEFAULT_MODEL = process.env.DEFAULT_CHAT_MODEL || 'llama3.2:3b'
 
 // Ollama installer download URLs (official Ollama releases)
 const OLLAMA_INSTALLERS = {

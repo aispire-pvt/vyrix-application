@@ -4,7 +4,6 @@ import Login from './pages/Login'
 import Profile from './pages/Profile'
 import Tutorials from './pages/Tutorials'
 import TutorialsNext from './pages/TutorialsNext'
-import NDA from './pages/NDA'
 import Home from './pages/Home'
 import Editor from './pages/Editor'
 import Folder from './pages/Folder'
@@ -26,7 +25,6 @@ export default function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
       <Route path="/profile" element={<Profile />} />
-      <Route path="/nda" element={<NDA />} />
       <Route path="/tutorials" element={<Tutorials />} />
       <Route path="/tutorials/next" element={<TutorialsNext />} />
 

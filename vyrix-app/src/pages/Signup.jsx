@@ -5,7 +5,7 @@ import Button from '../components/ui/Button'
 import Divider from '../components/ui/Divider'
 import OnboardingSidebar from '../components/onboarding/OnboardingSidebar'
 import LegalModal from '../components/ui/LegalModal'
-import { PRIVACY_POLICY_TEXT, TERMS_OF_USE_TEXT } from '../constants/legalText'
+import { PRIVACY_POLICY_TEXT, TERMS_OF_USE_TEXT, NDA_TEXT } from '../constants/legalText'
 
 import googleIcon from '../assets/google.png'
 import eyeIcon from '../assets/eye.png'
@@ -17,7 +17,7 @@ export default function Signup() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [legalAccepted, setLegalAccepted] = useState(false)
-  const [modal, setModal] = useState(null) // 'terms' | 'privacy' | null
+  const [modal, setModal] = useState(null) // 'terms' | 'privacy' | 'nda' | null
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
@@ -30,9 +30,22 @@ export default function Signup() {
       window.vyrix.off('auth:deepLink', onDeepLink)
       setLoading(false)
       if (err || !token) { setError(err || 'Google sign-in failed.'); return }
-      window.vyrix.saveToken(token).then((result) => {
+      window.vyrix.saveToken(token).then(async (result) => {
         if (!result?.success) { setError(result?.message || 'Google sign-in failed.'); return }
-        navigate('/home')
+        // Google users skip the signup form — route them through /profile so they
+        // accept Terms/Privacy/NDA + finish onboarding before reaching /home.
+        try {
+          const [meRes, legal] = await Promise.all([
+            window.vyrix.getMe(),
+            window.vyrix.legal.status(),
+          ])
+          const u = meRes?.user
+          const legallyDone = legal?.ndaAccepted && legal?.termsAccepted && legal?.privacyAccepted
+          if (!u?.onboardingCompleted || !legallyDone) navigate('/profile')
+          else navigate('/home')
+        } catch {
+          navigate('/profile')
+        }
       })
     }
     window.vyrix.on('auth:deepLink', onDeepLink)
@@ -43,12 +56,12 @@ export default function Signup() {
     setError('')
     if (!form.firstName || !form.lastName || !form.email || !form.password) { setError('Please fill in all fields.'); return }
     if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return }
-    if (!legalAccepted) { setError('You must agree to the Terms of Use and Privacy Policy.'); return }
+    if (!legalAccepted) { setError('You must agree to the Terms of Use, Privacy Policy, and Beta Tester NDA.'); return }
     setLoading(true)
     try {
       const result = await window.vyrix.register(form)
       if (!result.success) { setError(result.message || 'Registration failed.'); return }
-      await window.vyrix.legal.accept({ terms: true, privacy: true, nda: false, userName: `${form.firstName} ${form.lastName}` })
+      await window.vyrix.legal.accept({ terms: true, privacy: true, nda: true, userName: `${form.firstName} ${form.lastName}` })
       navigate('/profile')
     } catch (err) {
       setError('Something went wrong. Please try again.')
@@ -61,6 +74,7 @@ export default function Signup() {
     <>
     {modal === 'terms'   && <LegalModal title="Terms of Use"    onClose={() => setModal(null)}><TermsContent /></LegalModal>}
     {modal === 'privacy' && <LegalModal title="Privacy Policy"  onClose={() => setModal(null)}><PrivacyContent /></LegalModal>}
+    {modal === 'nda'     && <LegalModal title="Beta Tester NDA" onClose={() => setModal(null)}><NDAContent /></LegalModal>}
     <div className="flex h-screen w-full items-stretch gap-6 bg-black p-5">
       <OnboardingSidebar activeStep={1} />
 
@@ -99,8 +113,10 @@ export default function Signup() {
             <span className="font-sf text-[13px] text-[#a3a3a3]">
               I agree to the{' '}
               <button type="button" onClick={() => setModal('terms')} className="text-[#b2c5f2] underline underline-offset-2">Terms of Use</button>
-              {' '}and{' '}
+              ,{' '}
               <button type="button" onClick={() => setModal('privacy')} className="text-[#b2c5f2] underline underline-offset-2">Privacy Policy</button>
+              {', and the '}
+              <button type="button" onClick={() => setModal('nda')} className="text-[#b2c5f2] underline underline-offset-2">Beta Tester NDA</button>
             </span>
           </label>
 
@@ -145,6 +161,20 @@ function PrivacyContent() {
     <div className="flex flex-col gap-3">
       <p className="font-unbounded text-[12px] text-[#a3a3a3]">Aispire Private Limited — Last Updated: June 24, 2026</p>
       {PRIVACY_POLICY_TEXT.map((section, i) => (
+        <div key={i}>
+          {section.heading && <h3 className="mt-3 font-sf text-[13px] font-bold text-white">{section.heading}</h3>}
+          <p className="whitespace-pre-wrap font-sf text-[13px] text-[#c7c7c7]">{section.body}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function NDAContent() {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="font-unbounded text-[12px] text-[#a3a3a3]">Aispire Private Limited — Beta Tester NDA</p>
+      {NDA_TEXT.map((section, i) => (
         <div key={i}>
           {section.heading && <h3 className="mt-3 font-sf text-[13px] font-bold text-white">{section.heading}</h3>}
           <p className="whitespace-pre-wrap font-sf text-[13px] text-[#c7c7c7]">{section.body}</p>

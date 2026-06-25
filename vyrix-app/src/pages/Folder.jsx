@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getMe, folders as foldersApi, projects } from '../api/local'
 import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
+import TodoPanel from '../components/home/TodoPanel'
 import DocumentCard from '../components/home/DocumentCard'
 import MoveModal from '../components/home/MoveModal'
 import { relativeTime } from '../utils/relativeTime'
@@ -151,6 +152,12 @@ export default function Folder() {
             ))}
           </div>
         </div>
+
+        <TodoPanel
+          isOpen={isTodoOpen}
+          onClose={() => setIsTodoOpen(false)}
+          firstName={user?.firstName}
+        />
       </div>
 
       <MoveModal

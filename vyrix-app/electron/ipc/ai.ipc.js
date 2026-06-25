@@ -28,7 +28,7 @@ const fs             = require('fs')
 
 // ── Configuration ─────────────────────────────────────────────────────────
 const OLLAMA_BASE_URL   = process.env.OLLAMA_BASE_URL   || 'http://127.0.0.1:11434'
-const DEFAULT_MODEL     = process.env.DEFAULT_CHAT_MODEL || 'llama3.2:3b-instruct'
+const DEFAULT_MODEL     = process.env.DEFAULT_CHAT_MODEL || 'llama3.2:3b'
 const HISTORY_LIMIT     = 20
 const HEALTH_TIMEOUT_MS = 5_000
 const CHAT_TIMEOUT_MS   = 120_000
