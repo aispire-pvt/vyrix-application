@@ -62,7 +62,7 @@
       "node_modules/better-sqlite3/**"
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": "nsis",
       "icon": "build/icon.ico",
       "artifactName": "Vyrix-Setup-${version}.${ext}",
       "publisherName": "Aispire Private Limited"
@@ -76,7 +76,7 @@
       "shortcutName": "Vyrix"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": "dmg",
       "icon": "build/icon.icns",
       "artifactName": "Vyrix-${version}.${ext}",
       "category": "public.app-category.productivity",
@@ -86,7 +86,7 @@
       "title": "Vyrix ${version}"
     },
     "linux": {
-      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "target": "AppImage",
       "icon": "build/icon.png",
       "artifactName": "Vyrix-${version}.${ext}",
       "category": "Office"
