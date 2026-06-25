@@ -65,7 +65,7 @@
       "target": "nsis",
       "icon": "build/icon.ico",
       "artifactName": "Vyrix-Setup-${version}.${ext}",
-      "publisherName": "Aispire Private Limited"
+      "publisherName": ["Aispire Private Limited"]
     },
     "nsis": {
       "oneClick": false,
