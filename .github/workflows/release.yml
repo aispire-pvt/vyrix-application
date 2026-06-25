@@ -22,7 +22,7 @@ jobs:
         working-directory: vyrix-app
 
       - name: Build & publish Windows installer
-        run: npm run dist:win
+        run: npx electron-vite build && npx electron-builder --win --publish always
         working-directory: vyrix-app
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -43,7 +43,7 @@ jobs:
         working-directory: vyrix-app
 
       - name: Build & publish Mac DMG
-        run: npm run dist:mac
+        run: npx electron-vite build && npx electron-builder --mac --publish always
         working-directory: vyrix-app
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

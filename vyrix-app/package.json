@@ -92,7 +92,7 @@
       "provider": "github",
       "owner": "aispire-pvt",
       "repo": "vyrix-application",
-      "releaseType": "release"
+      "releaseType": "draft"
     }
   }
 }
