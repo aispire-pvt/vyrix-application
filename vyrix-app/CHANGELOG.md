@@ -117,7 +117,7 @@ Stored in Electron's `userData` directory (`AppData/Roaming/Vyrix/vyrix-ai.db`).
 
 **System prompt:** Research-only assistant persona — scoped to PhD/academic work (literature review, methodology, academic writing, etc.). Refuses off-topic requests with a fixed message.
 
-**Model:** `llama3.2:3b-instruct` via local Ollama at `http://127.0.0.1:11434`
+**Model:** `llama3.2:3b` via local Ollama at `http://127.0.0.1:11434`
 
 ---
 

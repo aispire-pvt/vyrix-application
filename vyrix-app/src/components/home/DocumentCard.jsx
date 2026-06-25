@@ -1,14 +1,14 @@
 // Reusable document card (Recent Activity + bottom recent files rows).
 // Props: { title, timestamp, thumbnail, coverIndex, size = 'large', onClick, onMoveClick }
-//   size='large' → w-[339px] h-[191px]   size='small' → w-[266px] h-[166px]
+//   size='large' → w-[230px] h-[128px]   size='small' → w-[180px] h-[110px]
 //   Always renders a cover image: an explicit `thumbnail`, else the doc's
 //   assigned cover from the COVER_IMAGES pool (via coverIndex).
 
 import { getCoverImage } from '../../utils/coverImages'
 
 const SIZES = {
-  large: 'w-[260px] h-[148px]',
-  small: 'w-[200px] h-[125px]',
+  large: 'w-[230px] h-[128px]',
+  small: 'w-[180px] h-[110px]',
 }
 
 function HoverButton({ children, label }) {

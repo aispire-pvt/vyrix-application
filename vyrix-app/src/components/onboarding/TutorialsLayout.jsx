@@ -13,35 +13,35 @@ const PARAGRAPHS = [
 //   onLinkClick   — handler for the link
 export default function TutorialsLayout({ linkLabel, linkColorClass, onLinkClick }) {
   return (
-    <div className="flex min-h-screen w-full items-stretch gap-8 bg-black p-7">
+    <div className="flex h-screen w-full items-stretch gap-8 overflow-hidden bg-black p-7">
       {/* Left panel — all 3 steps active */}
       <OnboardingSidebar activeStep={3} />
 
-      {/* Right panel — tutorial content */}
-      <section className="flex flex-1 flex-col px-12 py-10">
+      {/* Right panel — tutorial content (scrolls on short viewports) */}
+      <section className="flex flex-1 flex-col overflow-y-auto px-12 py-6">
         <div className="flex w-full items-start justify-between">
-          <h1 className="font-unbounded text-[40px] font-medium leading-tight text-white">
+          <h1 className="font-unbounded text-[32px] font-medium leading-tight text-white">
             Tutorials
           </h1>
           <button
             type="button"
             onClick={onLinkClick}
-            className={`font-sf text-[20px] ${linkColorClass}`}
+            className={`font-sf text-[18px] ${linkColorClass}`}
           >
             {linkLabel}
           </button>
         </div>
 
-        <div className="mt-6 flex w-[612px] max-w-full flex-col gap-4">
+        <div className="mt-4 flex w-full max-w-[612px] flex-col gap-3">
           {PARAGRAPHS.map((text, i) => (
-            <p key={i} className="font-sf text-[16px] leading-relaxed text-white">
+            <p key={i} className="font-sf text-[14px] leading-relaxed text-white">
               {text}
             </p>
           ))}
         </div>
 
-        {/* Tutorial preview — annotated home-screen tour */}
-        <div className="mt-6 h-[589px] w-[612px] max-w-full overflow-hidden rounded-[11px] bg-vyrix-input">
+        {/* Tutorial preview — annotated home-screen tour (responsive) */}
+        <div className="mt-4 aspect-square w-full max-w-[612px] overflow-hidden rounded-[11px] bg-vyrix-input">
           <img src={tutorialMedia} alt="Vyrix tutorial preview" className="h-full w-full object-contain" />
         </div>
       </section>

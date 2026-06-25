@@ -219,6 +219,15 @@ function getAiDb() {
       CREATE INDEX IF NOT EXISTS idx_msg_conv
         ON messages (conversation_id, created_at ASC);
     `)
+
+    // Migration: heal conversations that stored the old, non-existent
+    // 'llama3.2:3b-instruct' tag (which returns 404 from Ollama).
+    try {
+      aiDb.prepare(`UPDATE conversations SET model = ? WHERE model = ?`)
+          .run('llama3.2:3b', 'llama3.2:3b-instruct')
+      aiDb.prepare(`UPDATE messages SET model = ? WHERE model = ?`)
+          .run('llama3.2:3b', 'llama3.2:3b-instruct')
+    } catch {}
   }
   return aiDb
 }
@@ -357,7 +366,7 @@ function register(ipcMain) {
         preferredModel: hasDefault ? DEFAULT_MODEL : (models[0]?.name || DEFAULT_MODEL),
         message: models.length > 0
           ? `Ollama is running. Model: ${hasDefault ? DEFAULT_MODEL : models[0]?.name}`
-          : 'Ollama is running but no models found. Run: ollama pull llama3.2:3b-instruct',
+          : `Ollama is running but no models found. Run: ollama pull ${DEFAULT_MODEL}`,
       }
     } catch (err) {
       return {

@@ -23,6 +23,10 @@ export default function Signup() {
 
   const handleGoogle = () => {
     setError('')
+    if (!legalAccepted) {
+      setError('You must agree to the Terms of Use, Privacy Policy, and Beta Tester NDA.')
+      return
+    }
     setLoading(true)
     window.vyrix.loginGoogle()
 
@@ -75,10 +79,10 @@ export default function Signup() {
     {modal === 'terms'   && <LegalModal title="Terms of Use"    onClose={() => setModal(null)}><TermsContent /></LegalModal>}
     {modal === 'privacy' && <LegalModal title="Privacy Policy"  onClose={() => setModal(null)}><PrivacyContent /></LegalModal>}
     {modal === 'nda'     && <LegalModal title="Beta Tester NDA" onClose={() => setModal(null)}><NDAContent /></LegalModal>}
-    <div className="flex h-screen w-full items-stretch gap-6 bg-black p-5">
+    <div className="flex h-screen w-full items-stretch gap-6 overflow-hidden bg-black p-5">
       <OnboardingSidebar activeStep={1} />
 
-      <section className="flex flex-1 items-center justify-center px-4 py-6">
+      <section className="flex flex-1 items-center justify-center overflow-y-auto px-4 py-6">
         <form onSubmit={handleSubmit} className="flex w-[434px] max-w-full flex-col">
           <h1 className="text-center font-unbounded text-[28px] font-medium leading-tight text-white">Sign up your Account</h1>
           <p className="mt-2 text-center font-sf text-[15px] text-vyrix-label">Enter your personal details to create your account</p>
@@ -123,11 +127,11 @@ export default function Signup() {
           {error && <p className="mt-3 text-center font-sf text-[13px] text-red-400">{error}</p>}
 
           <Divider className="mt-4" />
-          <Button variant="outline" className="mt-4" type="button" onClick={handleGoogle}>
+          <Button variant="outline" className="mt-4" type="button" onClick={handleGoogle} disabled={!legalAccepted || loading}>
             <img src={googleIcon} alt="" className="h-[22px] w-[22px]" />
             Google
           </Button>
-          <Button variant="primary" className="mt-3" type="submit" disabled={loading}>
+          <Button variant="primary" className="mt-3" type="submit" disabled={loading || !legalAccepted}>
             {loading ? 'Creating account...' : 'Sign Up'}
           </Button>
 

@@ -133,12 +133,12 @@ export default function Profile() {
     {modal === 'terms'   && <LegalModal title="Terms of Use"    onClose={() => setModal(null)}><LegalSections sections={TERMS_OF_USE_TEXT} /></LegalModal>}
     {modal === 'privacy' && <LegalModal title="Privacy Policy"  onClose={() => setModal(null)}><LegalSections sections={PRIVACY_POLICY_TEXT} /></LegalModal>}
     {modal === 'nda'     && <LegalModal title="Beta Tester NDA" onClose={() => setModal(null)}><LegalSections sections={NDA_TEXT} /></LegalModal>}
-    <div className="flex h-screen w-full items-stretch gap-6 bg-black p-5">
+    <div className="flex h-screen w-full items-stretch gap-6 overflow-hidden bg-black p-5">
       {/* Left panel — steps 1 & 2 active */}
       <OnboardingSidebar activeStep={2} />
 
-      {/* Right panel — profile form */}
-      <section className="flex flex-1 items-center justify-center px-4 py-6">
+      {/* Right panel — profile form (scrolls on short viewports) */}
+      <section className="flex flex-1 items-center justify-center overflow-y-auto px-4 py-6">
         <div className="flex w-[434px] max-w-full flex-col">
           <h1 className="whitespace-nowrap text-center font-unbounded text-[28px] font-medium leading-tight text-white">
             Setting up your Profile

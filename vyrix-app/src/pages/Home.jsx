@@ -71,7 +71,7 @@ export default function Home() {
       <div className="relative flex flex-1 flex-col overflow-hidden">
         <Navbar onToggleTodo={() => setIsTodoOpen((v) => !v)} isTodoOpen={isTodoOpen} />
 
-        <div className="flex-1 overflow-hidden bg-black px-[20px] pb-[20px]">
+        <div className="flex-1 overflow-y-auto bg-black px-[20px] pb-[20px]">
           <GreetingHeader
             firstName={user?.firstName}
             docs={docs}
