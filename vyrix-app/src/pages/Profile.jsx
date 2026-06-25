@@ -90,7 +90,7 @@ export default function Profile() {
       const profileRes = await window.vyrix.onboarding.saveProfile(form.username.trim(), form.profession.trim(), filePath)
       if (!profileRes.success) { setError(profileRes.message || 'Something went wrong.'); return }
 
-      navigate('/tutorials')
+      navigate('/nda')
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {

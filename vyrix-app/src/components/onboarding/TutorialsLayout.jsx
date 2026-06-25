@@ -39,8 +39,12 @@ export default function TutorialsLayout({ linkLabel, linkColorClass, onLinkClick
           ))}
         </div>
 
-        {/* Media / video placeholder */}
-        <div className="mt-6 h-[589px] w-[612px] max-w-full rounded-11 bg-vyrix-input" />
+        {/* Tutorial media — swap src once tutorials-bg.png is added to src/assets/ */}
+        <div className="mt-6 h-[589px] w-[612px] max-w-full overflow-hidden rounded-[11px] bg-vyrix-input">
+          {typeof tutorialsBgUrl !== 'undefined' && (
+            <img src={tutorialsBgUrl} alt="Vyrix tutorials" className="h-full w-full object-cover" />
+          )}
+        </div>
       </section>
     </div>
   )

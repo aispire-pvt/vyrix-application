@@ -155,6 +155,9 @@ function register(ipcMain) {
 
     ipcMain.handle("flows:remove", (_, projectId, flowId) => {
         writeFlows(projectId, readFlows(projectId).filter((f) => f.id !== flowId));
+        // Clean up files on disk for this flow
+        const dir = path.join(app.getPath("userData"), "Vyrix", "projects", projectId, "flows", flowId);
+        try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
         return { ok: true };
     });
 

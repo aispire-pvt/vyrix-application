@@ -4,6 +4,8 @@ import InputField from '../components/ui/InputField'
 import Button from '../components/ui/Button'
 import Divider from '../components/ui/Divider'
 import OnboardingSidebar from '../components/onboarding/OnboardingSidebar'
+import LegalModal from '../components/ui/LegalModal'
+import { PRIVACY_POLICY_TEXT, TERMS_OF_USE_TEXT } from '../constants/legalText'
 
 import googleIcon from '../assets/google.png'
 import eyeIcon from '../assets/eye.png'
@@ -14,6 +16,8 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [legalAccepted, setLegalAccepted] = useState(false)
+  const [modal, setModal] = useState(null) // 'terms' | 'privacy' | null
 
   const update = (key) => (e) => setForm({ ...form, [key]: e.target.value })
 
@@ -39,10 +43,12 @@ export default function Signup() {
     setError('')
     if (!form.firstName || !form.lastName || !form.email || !form.password) { setError('Please fill in all fields.'); return }
     if (form.password.length < 8) { setError('Password must be at least 8 characters.'); return }
+    if (!legalAccepted) { setError('You must agree to the Terms of Use and Privacy Policy.'); return }
     setLoading(true)
     try {
       const result = await window.vyrix.register(form)
       if (!result.success) { setError(result.message || 'Registration failed.'); return }
+      await window.vyrix.legal.accept({ terms: true, privacy: true, nda: false, userName: `${form.firstName} ${form.lastName}` })
       navigate('/profile')
     } catch (err) {
       setError('Something went wrong. Please try again.')
@@ -52,6 +58,9 @@ export default function Signup() {
   }
 
   return (
+    <>
+    {modal === 'terms'   && <LegalModal title="Terms of Use"    onClose={() => setModal(null)}><TermsContent /></LegalModal>}
+    {modal === 'privacy' && <LegalModal title="Privacy Policy"  onClose={() => setModal(null)}><PrivacyContent /></LegalModal>}
     <div className="flex h-screen w-full items-stretch gap-6 bg-black p-5">
       <OnboardingSidebar activeStep={1} />
 
@@ -79,6 +88,22 @@ export default function Signup() {
             </div>
           </div>
 
+          {/* Legal acceptance checkbox */}
+          <label className="mt-4 flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={legalAccepted}
+              onChange={(e) => setLegalAccepted(e.target.checked)}
+              className="mt-[2px] h-4 w-4 shrink-0 accent-[#b2c5f2]"
+            />
+            <span className="font-sf text-[13px] text-[#a3a3a3]">
+              I agree to the{' '}
+              <button type="button" onClick={() => setModal('terms')} className="text-[#b2c5f2] underline underline-offset-2">Terms of Use</button>
+              {' '}and{' '}
+              <button type="button" onClick={() => setModal('privacy')} className="text-[#b2c5f2] underline underline-offset-2">Privacy Policy</button>
+            </span>
+          </label>
+
           {error && <p className="mt-3 text-center font-sf text-[13px] text-red-400">{error}</p>}
 
           <Divider className="mt-4" />
@@ -86,7 +111,9 @@ export default function Signup() {
             <img src={googleIcon} alt="" className="h-[22px] w-[22px]" />
             Google
           </Button>
-          <Button variant="primary" className="mt-3" type="submit">{loading ? 'Creating account...' : 'Sign Up'}</Button>
+          <Button variant="primary" className="mt-3" type="submit" disabled={loading}>
+            {loading ? 'Creating account...' : 'Sign Up'}
+          </Button>
 
           <p className="mt-4 text-center font-sf text-[14px] text-vyrix-placeholder">
             Already have an Account?{' '}
@@ -94,6 +121,35 @@ export default function Signup() {
           </p>
         </form>
       </section>
+    </div>
+    </>
+  )
+}
+
+function TermsContent() {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="font-unbounded text-[12px] text-[#a3a3a3]">Aispire Private Limited — Last Updated: June 24, 2026</p>
+      {TERMS_OF_USE_TEXT.map((section, i) => (
+        <div key={i}>
+          {section.heading && <h3 className="mt-3 font-sf text-[13px] font-bold text-white">{section.heading}</h3>}
+          <p className="whitespace-pre-wrap font-sf text-[13px] text-[#c7c7c7]">{section.body}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function PrivacyContent() {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="font-unbounded text-[12px] text-[#a3a3a3]">Aispire Private Limited — Last Updated: June 24, 2026</p>
+      {PRIVACY_POLICY_TEXT.map((section, i) => (
+        <div key={i}>
+          {section.heading && <h3 className="mt-3 font-sf text-[13px] font-bold text-white">{section.heading}</h3>}
+          <p className="whitespace-pre-wrap font-sf text-[13px] text-[#c7c7c7]">{section.body}</p>
+        </div>
+      ))}
     </div>
   )
 }

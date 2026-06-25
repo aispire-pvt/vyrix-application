@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, dialog } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 
@@ -13,6 +13,34 @@ const onboardingIpc    = require("./ipc/onboarding.ipc");
 const aiIpc            = require("./ipc/ai.ipc");
 
 const isDev = process.env.NODE_ENV === "development" || !app.isPackaged;
+
+// Auto-updater — only active in production builds
+let autoUpdater;
+if (!isDev) {
+    try {
+        ({ autoUpdater } = require("electron-updater"));
+        autoUpdater.autoDownload = true;
+        autoUpdater.autoInstallOnAppQuit = true;
+
+        autoUpdater.on("update-downloaded", (info) => {
+            dialog.showMessageBox({
+                type: "info",
+                title: "Update ready",
+                message: `Vyrix ${info.version} has been downloaded and will install when you close the app.`,
+                buttons: ["Restart now", "Later"],
+                defaultId: 0,
+            }).then(({ response }) => {
+                if (response === 0) autoUpdater.quitAndInstall();
+            });
+        });
+
+        autoUpdater.on("error", (err) => {
+            console.error("Auto-updater error:", err?.message);
+        });
+    } catch {
+        // electron-updater not available — silently skip
+    }
+}
 
 // Single-instance lock — required so second-instance fires on the running app
 // when a vyrix:// URL is launched, instead of Windows spawning a new instance.
@@ -92,6 +120,9 @@ app.whenReady().then(() => {
     onboardingIpc.register(ipcMain);
     aiIpc.register(ipcMain);
     createWindow();
+
+    // Check for updates 5s after launch so the window is ready
+    if (autoUpdater) setTimeout(() => autoUpdater.checkForUpdatesAndNotify(), 5000);
 });
 
 app.on("window-all-closed", () => {

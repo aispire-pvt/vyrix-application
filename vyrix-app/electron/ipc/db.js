@@ -47,10 +47,11 @@ function initDB() {
         );
     `);
 
-    // Migration: add parent_id column to existing databases
+    // Migrations — each wrapped in a transaction so a partial failure leaves the schema clean
+    const runMigration = db.transaction((sql) => db.exec(sql));
     const cols = db.prepare("PRAGMA table_info(projects)").all().map((c) => c.name);
     if (!cols.includes("parent_id")) {
-        db.exec("ALTER TABLE projects ADD COLUMN parent_id TEXT REFERENCES projects(id) ON DELETE CASCADE");
+        runMigration("ALTER TABLE projects ADD COLUMN parent_id TEXT REFERENCES projects(id) ON DELETE CASCADE");
     }
 }
 

@@ -65,6 +65,12 @@ contextBridge.exposeInMainWorld("vyrix", {
         saveProfile: (username, profession, file) => ipcRenderer.invoke("onboarding:saveProfile", username, profession, file),
     },
 
+    // ── Legal ─────────────────────────────────────────────────────────────────
+    legal: {
+        accept: (payload) => ipcRenderer.invoke("legal:accept", payload),
+        status: ()        => ipcRenderer.invoke("legal:status"),
+    },
+
     // ── Sync ──────────────────────────────────────────────────────────────────
     sync: {
         drain: () => ipcRenderer.invoke("sync:drain"),

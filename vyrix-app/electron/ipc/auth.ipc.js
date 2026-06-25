@@ -168,6 +168,61 @@ function register(ipcMain) {
             return { success: false, message: "Failed to verify token" };
         }
     });
+
+    // Legal acceptance — written locally for offline resilience, then synced to MongoDB
+    ipcMain.handle("legal:accept", async (_, { nda, terms, privacy, userName }) => {
+        const ts = new Date().toISOString();
+        if (nda)     store.set("legal.ndaAcceptedAt",     ts);
+        if (terms)   store.set("legal.termsAcceptedAt",   ts);
+        if (privacy) store.set("legal.privacyAcceptedAt", ts);
+        if (userName) store.set("legal.acceptedBy", userName);
+
+        // Best-effort backend sync — don't block the UI if offline
+        apiFetch("/api/auth/legal-accept", {
+            method: "POST",
+            body: { nda: !!nda, terms: !!terms, privacy: !!privacy },
+        }).catch(() => {});
+
+        return { ok: true, acceptedAt: ts };
+    });
+
+    ipcMain.handle("legal:status", async () => {
+        // Prefer local store (instant); fall back to backend if local is empty
+        const localNda     = store.get("legal.ndaAcceptedAt");
+        const localTerms   = store.get("legal.termsAcceptedAt");
+        const localPrivacy = store.get("legal.privacyAcceptedAt");
+
+        if (localNda && localTerms && localPrivacy) {
+            return {
+                ndaAccepted: true, termsAccepted: true, privacyAccepted: true,
+                acceptedAt: localNda, acceptedBy: store.get("legal.acceptedBy") || null,
+            };
+        }
+
+        // Try backend (e.g. fresh install on same account)
+        try {
+            const data = await apiFetch("/api/auth/me");
+            const user = data?.user || {};
+            if (user.ndaAcceptedAt)     store.set("legal.ndaAcceptedAt",     user.ndaAcceptedAt);
+            if (user.termsAcceptedAt)   store.set("legal.termsAcceptedAt",   user.termsAcceptedAt);
+            if (user.privacyAcceptedAt) store.set("legal.privacyAcceptedAt", user.privacyAcceptedAt);
+            return {
+                ndaAccepted:     !!user.ndaAcceptedAt,
+                termsAccepted:   !!user.termsAcceptedAt,
+                privacyAccepted: !!user.privacyAcceptedAt,
+                acceptedAt:      user.ndaAcceptedAt     || null,
+                acceptedBy:      store.get("legal.acceptedBy") || null,
+            };
+        } catch {
+            return {
+                ndaAccepted:     !!localNda,
+                termsAccepted:   !!localTerms,
+                privacyAccepted: !!localPrivacy,
+                acceptedAt:      localNda || null,
+                acceptedBy:      store.get("legal.acceptedBy") || null,
+            };
+        }
+    });
 }
 
 module.exports = { register, getToken, store, apiFetch };

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FlowNode from './FlowNode'
 import { flows as flowsApi } from '../../api/local'
@@ -9,6 +9,7 @@ export default function FlowDiagram({ projectId, flows = [], onReordered, onAddF
   const [isEditMode, setIsEditMode] = useState(false)
   const [localFlows, setLocalFlows] = useState(flows)
   const dragIndexRef = useRef(null)
+  const autoSaveTimerRef = useRef(null)
   const [saving, setSaving] = useState(false)
 
   const [showNewFlowInput, setShowNewFlowInput] = useState(false)
@@ -21,6 +22,22 @@ export default function FlowDiagram({ projectId, flows = [], onReordered, onAddF
     dragIndexRef.current = index
   }
 
+  const autoSave = useCallback((reordered) => {
+    clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setSaving(true)
+        await flowsApi.reorder(projectId, reordered.map((f) => f.id))
+        onReordered?.(reordered)
+      } catch {
+        // revert if save fails
+        setLocalFlows([...flows])
+      } finally {
+        setSaving(false)
+      }
+    }, 300)
+  }, [projectId, flows, onReordered])
+
   const handleDrop = (dropIndex) => {
     const dragIndex = dragIndexRef.current
     if (dragIndex === null || dragIndex === dropIndex) return
@@ -29,6 +46,7 @@ export default function FlowDiagram({ projectId, flows = [], onReordered, onAddF
     reordered.splice(dropIndex, 0, removed)
     setLocalFlows(reordered)
     dragIndexRef.current = null
+    if (isEditMode) autoSave(reordered)
   }
 
   const toggleEditMode = async () => {

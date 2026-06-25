@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Profile from './pages/Profile'
 import Tutorials from './pages/Tutorials'
 import TutorialsNext from './pages/TutorialsNext'
+import NDA from './pages/NDA'
 import Home from './pages/Home'
 import Editor from './pages/Editor'
 import Folder from './pages/Folder'
@@ -13,16 +14,19 @@ import FlowView from './pages/FlowView'
 import AI from './pages/AI'
 import MainRepo from './pages/MainRepo'
 import ProtectedRoute from './components/ProtectedRoute'
+import ErrorBoundary from './components/ui/ErrorBoundary'
 import { TabsProvider } from './context/TabsContext'
 
 export default function App() {
   return (
     <TabsProvider>
+    <ErrorBoundary>
     <Routes>
       <Route path="/" element={<Navigate to="/signup" replace />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
       <Route path="/profile" element={<Profile />} />
+      <Route path="/nda" element={<NDA />} />
       <Route path="/tutorials" element={<Tutorials />} />
       <Route path="/tutorials/next" element={<TutorialsNext />} />
 
@@ -40,6 +44,7 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/signup" replace />} />
     </Routes>
+    </ErrorBoundary>
     </TabsProvider>
   )
 }

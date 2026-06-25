@@ -42,6 +42,9 @@ async function drainQueue() {
                 .run(row.id);
         }
     }
+
+    // Purge permanently failed items (≥5 attempts) — they will never succeed
+    getDB().prepare(`DELETE FROM sync_queue WHERE attempts >= 5`).run();
 }
 
 function register(ipcMain) {

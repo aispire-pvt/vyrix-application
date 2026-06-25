@@ -273,9 +273,30 @@ export default function AI() {
 
         {/* Ollama status banner — only shown when not OK */}
         {ollamaStatus && !ollamaStatus.ok && (
-          <div className="z-50 flex items-center gap-2 border-b border-red-900/40 bg-red-950/60 px-5 py-2 text-[12px] text-red-300">
-            <span className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-red-400" />
-            <span>{ollamaStatus.message}</span>
+          <div className="z-50 flex flex-col gap-2 border-b border-red-900/40 bg-red-950/60 px-5 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-[6px] w-[6px] flex-shrink-0 rounded-full bg-red-400" />
+                <span className="font-sf text-[12px] font-bold text-red-300">AI is offline — Ollama is not running</span>
+              </div>
+              <button
+                onClick={() => {
+                  setOllamaStatus(null)
+                  window.vyrix.ai.health()
+                    .then((r) => setOllamaStatus(r))
+                    .catch(() => setOllamaStatus({ ok: false, message: 'Still unreachable.' }))
+                }}
+                className="rounded-lg border border-red-700/50 px-3 py-1 font-sf text-[11px] text-red-300 hover:bg-red-900/40"
+              >
+                Retry
+              </button>
+            </div>
+            <div className="font-sf text-[11px] text-red-400/80">
+              To start Ollama, open a terminal and run:{' '}
+              <code className="rounded bg-red-900/40 px-2 py-0.5 font-mono text-red-200">ollama serve</code>
+              {' '}— if Ollama is not installed, download it from{' '}
+              <span className="text-red-200 underline cursor-pointer" onClick={() => window.vyrix.loginGoogle && window.open?.('https://ollama.com')}>ollama.com</span>
+            </div>
           </div>
         )}
 

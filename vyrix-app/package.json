@@ -1,13 +1,21 @@
 {
   "name": "vyrix-app",
   "version": "0.1.0",
-  "description": "Vyrix desktop app",
-  "main": "electron/main.js",
+  "description": "Vyrix — structured research workspace for design students",
+  "main": "dist/main/main.js",
   "type": "commonjs",
+  "author": {
+    "name": "Aispire Private Limited",
+    "email": "business@aispire.co.in"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-vite build && electron-builder",
+    "dist:win": "electron-vite build && electron-builder --win",
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "dist:linux": "electron-vite build && electron-builder --linux"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",
@@ -22,6 +30,7 @@
     "axios": "^1.7.7",
     "better-sqlite3": "^11.5.0",
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.2"
@@ -31,8 +40,62 @@
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "electron": "^29.4.6",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13"
+  },
+  "build": {
+    "appId": "in.vyrix.app",
+    "productName": "Vyrix",
+    "copyright": "Copyright © 2025 Aispire Private Limited",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**"
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "Vyrix-Setup-${version}.${ext}",
+      "publisherName": "Aispire Private Limited"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Vyrix"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "build/icon.icns",
+      "artifactName": "Vyrix-${version}.${ext}",
+      "category": "public.app-category.productivity",
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "title": "Vyrix ${version}"
+    },
+    "linux": {
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "icon": "build/icon.png",
+      "artifactName": "Vyrix-${version}.${ext}",
+      "category": "Office"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "aispire-pvt",
+      "repo": "vyrix-application",
+      "releaseType": "release"
+    }
   }
 }

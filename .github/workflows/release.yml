@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: vyrix-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: vyrix-app
+
+      - name: Build & publish Windows installer
+        run: npm run dist:win
+        working-directory: vyrix-app
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: vyrix-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: vyrix-app
+
+      - name: Build & publish Mac DMG
+        run: npm run dist:mac
+        working-directory: vyrix-app
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
