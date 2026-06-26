@@ -5,8 +5,40 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
+  # Create the draft release exactly once, before any platform builds. This
+  # removes the parallel-publish race where two jobs each create a draft for the
+  # same tag and the assets end up split across duplicate drafts.
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read app version
+        id: ver
+        shell: bash
+        run: echo "version=$(node -p "require('./vyrix-app/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Create draft release if it doesn't exist
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        shell: bash
+        run: |
+          tag="v${{ steps.ver.outputs.version }}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists — reusing it."
+          else
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --draft \
+              --title "Vyrix $tag" --notes "Automated build — publish when ready."
+          fi
+
   build-windows:
+    needs: create-release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +60,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
   build-mac:
+    needs: create-release
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
