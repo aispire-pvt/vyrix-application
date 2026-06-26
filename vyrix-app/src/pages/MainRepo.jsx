@@ -145,17 +145,17 @@ export default function MainRepo() {
           ) : (
             <div className="flex flex-wrap gap-[24px]">
               {shownFiles.map((file, i) => {
-                const card = (
-                  <div className="flex w-[132px] cursor-pointer flex-col items-center gap-2">
+                const openable = !!(file.localPath || file.url)
+                return (
+                  <div
+                    key={file.id || i}
+                    onClick={() => openable && window.vyrix.openFile(file)}
+                    className={`flex w-[132px] flex-col items-center gap-2 ${openable ? 'cursor-pointer' : ''}`}
+                  >
                     <FileTypeIcon type={file.type} name={file.name} size={102} />
                     <p className="w-full truncate text-center text-[14px] font-[590] text-white">{file.name}</p>
                     <p className="text-[12px] capitalize text-[#d5d5d5]">{file.type || 'File'}</p>
                   </div>
-                )
-                return file.url ? (
-                  <a key={file.id || i} href={file.url} target="_blank" rel="noreferrer">{card}</a>
-                ) : (
-                  <div key={file.id || i}>{card}</div>
                 )
               })}
             </div>

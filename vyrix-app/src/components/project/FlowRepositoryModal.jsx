@@ -4,20 +4,18 @@ import FlowNode from './FlowNode'
 import FileTypeIcon from './FileTypeIcon'
 
 // A single file card — type icon + name + type (Figma 299:4255-4260).
+// Opens local files in the OS default app (or links in the browser) via IPC.
 function FileCard({ file }) {
-  const inner = (
-    <div className="flex w-[140px] flex-col items-center gap-2">
+  const openable = !!(file.localPath || file.url)
+  return (
+    <div
+      onClick={() => openable && window.vyrix.openFile(file)}
+      className={`flex w-[140px] flex-col items-center gap-2 ${openable ? 'cursor-pointer' : ''}`}
+    >
       <FileTypeIcon type={file.type} name={file.name} size={88} />
       <p className="w-full truncate text-center font-sf text-[16px] font-[590] text-white">{file.name}</p>
       <p className="text-center font-sf text-[12px] capitalize text-[#d5d5d5]">{file.type}</p>
     </div>
-  )
-  return file.url ? (
-    <a href={file.url} target="_blank" rel="noreferrer" className="cursor-pointer">
-      {inner}
-    </a>
-  ) : (
-    inner
   )
 }
 

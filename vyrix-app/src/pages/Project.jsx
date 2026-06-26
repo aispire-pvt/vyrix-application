@@ -310,9 +310,11 @@ export default function Project() {
                         onClick={() => {
                           if (att.type === 'document' && att.docId) {
                             navigate(`/doc/${att.docId}?projectId=${id}&attId=${att.id}`)
-                          } else if (att.type === 'link' && att.url) {
-                            window.open(att.url, '_blank')
-                          } else if ((att.type === 'canva' || att.type === 'figma') && att.url) {
+                          } else if (att.localPath || (typeof att.url === 'string' && att.url.startsWith('local://'))) {
+                            // Local file (pdf/image/word/etc.) → open in the OS default app
+                            window.vyrix.openFile(att)
+                          } else if (att.url) {
+                            // Real web link (link/canva/figma) → open in the browser
                             window.open(att.url, '_blank')
                           }
                         }}

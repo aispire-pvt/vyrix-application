@@ -1,8 +1,8 @@
-const { randomUUID } = require("crypto");
-const { getDB }      = require("./db");
-const { app }        = require("electron");
-const fs             = require("fs");
-const path           = require("path");
+const { randomUUID }  = require("crypto");
+const { getDB }       = require("./db");
+const { app, shell }  = require("electron");
+const fs              = require("fs");
+const path            = require("path");
 
 function detectType(name = "") {
     const ext = (name.split(".").pop() || "").toLowerCase();
@@ -50,6 +50,36 @@ function writeFlows(projectId, list) {
 }
 
 function register(ipcMain) {
+    // ── Open a file / link ──────────────────────────────────────────────────────
+    // Local files (research materials, attachments, flow files) open in the OS
+    // default app via shell.openPath; real web links open in the browser. The old
+    // `local://<path>` url scheme was never registered, so clicks did nothing —
+    // we resolve the real path from localPath (or strip the bogus scheme).
+    ipcMain.handle("attachments:openFile", async (_, file) => {
+        try {
+            if (!file) return { ok: false, error: "No file provided." };
+
+            let localPath = file.localPath;
+            if (!localPath && typeof file.url === "string" && file.url.startsWith("local://")) {
+                localPath = file.url.slice("local://".length);
+            }
+
+            if (localPath) {
+                const err = await shell.openPath(localPath); // "" on success
+                return err ? { ok: false, error: err } : { ok: true };
+            }
+
+            if (typeof file.url === "string" && /^https?:\/\//i.test(file.url)) {
+                await shell.openExternal(file.url);
+                return { ok: true };
+            }
+
+            return { ok: false, error: "This item has no openable file or link." };
+        } catch (err) {
+            return { ok: false, error: err?.message || "Could not open this file." };
+        }
+    });
+
     // ── Attachments ────────────────────────────────────────────────────────────
 
     // sourcePath = absolute path the user picked from dialog

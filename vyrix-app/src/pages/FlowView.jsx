@@ -91,7 +91,11 @@ export default function FlowView() {
           ) : (
             <div className="mb-8 flex flex-wrap gap-[18px]">
               {flow.files.map((file) => (
-                <div key={file.id} className="group flex cursor-pointer flex-col gap-2">
+                <div
+                  key={file.id}
+                  onClick={() => (file.localPath || file.url) && window.vyrix.openFile(file)}
+                  className="group flex cursor-pointer flex-col gap-2"
+                >
                   <div className="flex h-[130px] w-[200px] items-center justify-center overflow-hidden rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[#111118] transition-colors group-hover:border-[rgba(178,197,242,0.3)]">
                     {file.type === 'link' ? (
                       <div className="flex flex-col items-center gap-2 opacity-70">

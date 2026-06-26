@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("vyrix", {
     heartbeat:      (appVersion)      => ipcRenderer.invoke("auth:heartbeat", appVersion),
     logUsage:       (counters)        => ipcRenderer.invoke("auth:logUsage", counters),
     sendFeedback:   (type, message)   => ipcRenderer.invoke("feedback:send", type, message),
+    openFile:       (file)            => ipcRenderer.invoke("attachments:openFile", file),
 
     // ── Projects ──────────────────────────────────────────────────────────────
     projects: {
