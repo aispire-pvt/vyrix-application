@@ -22,6 +22,11 @@ const SUGGESTIONS = [
   'Lets review our ongoing projects',
 ]
 
+// The /ai page runs a larger context window (num_ctx 8192), so attached-file
+// text is capped higher here than in the lightweight in-editor chatbot.
+const AI_FILE_CHAR_CAP = 24000
+const AI_NUM_CTX       = 8192
+
 // AI research-assistant page — wired to Ollama via Electron IPC.
 export default function AI() {
   const navigate = useNavigate()
@@ -49,27 +54,47 @@ export default function AI() {
     fileInputRef.current?.click()
   }
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
     // Reset so the same file can be re-selected
     e.target.value = ''
 
+    const ext = (file.name.split('.').pop() || '').toLowerCase()
     const isText = file.type.startsWith('text/') ||
       /\.(txt|md|csv|json|js|ts|jsx|tsx|py|java|c|cpp|h|html|css|xml|yaml|yml|log)$/i.test(file.name)
+    const isDoc = ['pdf', 'docx', 'doc'].includes(ext)
 
-    if (!isText) {
-      // For non-text files just attach the name as context label
-      setAttachedFile({ name: file.name, content: null })
+    // Preferred path: extract real text in the main process (handles PDF / DOCX / text).
+    if (file.path && (isDoc || isText)) {
+      setAttachedFile({ name: file.name, content: null }) // show pill immediately
+      try {
+        const res = await window.vyrix.ai.extractFile(file.path)
+        if (res?.ok && res.text) {
+          setAttachedFile({ name: file.name, content: res.text.slice(0, AI_FILE_CHAR_CAP) })
+        } else {
+          // Extraction failed or produced no text (e.g. scanned/image-only PDF)
+          setAttachedFile({ name: file.name, content: null })
+        }
+      } catch {
+        setAttachedFile({ name: file.name, content: null })
+      }
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const content = ev.target.result?.slice(0, 8000) // cap at 8k chars
-      setAttachedFile({ name: file.name, content })
+    // Fallback when no file path is available: read text in the renderer.
+    if (isText) {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        const content = ev.target.result?.slice(0, AI_FILE_CHAR_CAP)
+        setAttachedFile({ name: file.name, content })
+      }
+      reader.readAsText(file)
+      return
     }
-    reader.readAsText(file)
+
+    // Non-text with no path (e.g. an image) — attach the name as a context label.
+    setAttachedFile({ name: file.name, content: null })
   }
 
   // Appends an AI error bubble and resets streaming state.
@@ -161,7 +186,7 @@ export default function AI() {
 
     let streamRes
     try {
-      streamRes = await window.vyrix.ai.streamMessage(convId, modelMessage)
+      streamRes = await window.vyrix.ai.streamMessage(convId, modelMessage, { num_ctx: AI_NUM_CTX })
     } catch (err) {
       showError(err?.message || 'Failed to contact AI backend.')
       return
@@ -379,7 +404,7 @@ export default function AI() {
             ref={fileInputRef}
             type="file"
             className="hidden"
-            accept=".txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.java,.c,.cpp,.h,.html,.css,.xml,.yaml,.yml,.log,text/*"
+            accept=".pdf,.docx,.doc,.txt,.md,.csv,.json,.js,.ts,.jsx,.tsx,.py,.java,.c,.cpp,.h,.html,.css,.xml,.yaml,.yml,.log,text/*"
             onChange={handleFileChange}
           />
 

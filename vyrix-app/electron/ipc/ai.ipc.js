@@ -32,6 +32,10 @@ const DEFAULT_MODEL     = process.env.DEFAULT_CHAT_MODEL || 'llama3.2:3b'
 const HISTORY_LIMIT     = 20
 const HEALTH_TIMEOUT_MS = 5_000
 const CHAT_TIMEOUT_MS   = 120_000
+const DEFAULT_NUM_CTX   = 4096          // window for the in-editor chatbot; /ai page overrides higher
+const MAX_EXTRACT_CHARS = 200_000       // hard cap on extracted file text returned over IPC
+const EMBED_MODEL       = process.env.EMBED_MODEL || 'nomic-embed-text'  // local 768-dim embeddings
+const META_TIMEOUT_MS   = 30_000        // short timeout for best-effort background metadata/embedding
 
 const SYSTEM_PROMPT = [
   'You are Vyrix, a local AI research assistant built exclusively for PhD students and academic researchers.',
@@ -340,6 +344,80 @@ function buildProviderMessages(history) {
   ]
 }
 
+// Build Ollama generation options from renderer-supplied opts.
+// Only num_ctx is honored today; invalid/absent values fall back to the default.
+function buildChatOptions(opts) {
+  const n = Number(opts && opts.num_ctx)
+  const num_ctx = Number.isFinite(n) && n >= 512 && n <= 131072 ? Math.floor(n) : DEFAULT_NUM_CTX
+  return { num_ctx }
+}
+
+// ── Catalog metadata + embedding (best-effort; used by the background sync) ──
+// All of these return null on any failure (Ollama down, model missing, bad JSON)
+// so they can never block or break the catalog sync — the caller falls back to
+// the existing empty defaults.
+
+// Quick liveness gate so a stopped Ollama fails fast instead of timing out.
+async function ollamaAlive() {
+  try { const r = await httpGet('/api/tags', 3000); return !!r.ok } catch { return false }
+}
+
+const META_SYSTEM =
+  'You extract bibliographic metadata from a research project and reply with ONLY a JSON object. ' +
+  'Keys: authors (string[]), publishers (string[]), year (integer or null), tags (string[] up to 6), ' +
+  'summary (string, 1-3 sentences). Use [] / null when unknown. Never invent authors, publishers, or years — ' +
+  'only include them if clearly present in the text.'
+
+// Coerce the model's JSON into a strict, safe shape.
+function sanitizeMetadata(obj) {
+  if (!obj || typeof obj !== 'object') return null
+  const strArr = (v, max) => Array.isArray(v)
+    ? v.filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim().slice(0, 200)).slice(0, max)
+    : []
+  let year = null
+  const y = parseInt(obj.year, 10)
+  if (Number.isFinite(y) && y >= 1000 && y <= 2100) year = y
+  return {
+    authors:    strArr(obj.authors, 20),
+    publishers: strArr(obj.publishers, 20),
+    year,
+    tags:       strArr(obj.tags, 6),
+    summary:    typeof obj.summary === 'string' ? obj.summary.trim().slice(0, 1200) : '',
+  }
+}
+
+// Extract {authors, publishers, year, tags, summary} from project text. null on failure.
+async function extractCatalogMetadata(title, bodyText) {
+  if (!(await ollamaAlive())) return null
+  const content = `Title: ${title || 'Untitled'}\n\n${(bodyText || '').slice(0, 24000)}`
+  try {
+    const res = await httpPost('/api/chat', {
+      model:    DEFAULT_MODEL,
+      messages: [{ role: 'system', content: META_SYSTEM }, { role: 'user', content }],
+      stream:   false,
+      format:   'json',
+      options:  { num_ctx: 8192 },
+    }, META_TIMEOUT_MS)
+    if (!res.ok) return null
+    const raw = res.body?.message?.content
+    if (!raw) return null
+    return sanitizeMetadata(JSON.parse(raw))
+  } catch { return null }
+}
+
+// Generate a local embedding vector for the given text. null on failure.
+async function generateEmbedding(text) {
+  if (!text || !(await ollamaAlive())) return null
+  try {
+    const res = await httpPost('/api/embeddings', {
+      model:  EMBED_MODEL,
+      prompt: String(text).slice(0, 8000),
+    }, META_TIMEOUT_MS)
+    if (!res.ok || !Array.isArray(res.body?.embedding) || res.body.embedding.length === 0) return null
+    return res.body.embedding
+  } catch { return null }
+}
+
 // ── IPC registration ──────────────────────────────────────────────────────
 function register(ipcMain) {
 
@@ -375,6 +453,41 @@ function register(ipcMain) {
         preferredModel: DEFAULT_MODEL,
         message: 'Cannot reach Ollama. Make sure Ollama is installed and running (ollama serve).',
       }
+    }
+  })
+
+  // Extract readable text from an attached file (PDF / DOCX / plain text) so the
+  // model can actually read its contents. Returns { ok, name, text, chars, truncated }.
+  ipcMain.handle('ai:extractFile', async (_, filePath) => {
+    try {
+      if (!filePath || typeof filePath !== 'string') return { ok: false, error: 'No file path provided.' }
+      const ext = path.extname(filePath).toLowerCase()
+      let text = ''
+
+      if (ext === '.pdf') {
+        // Import the parser module directly — pdf-parse's index.js runs debug code
+        // that reads a bundled test PDF and throws inside a packaged asar.
+        const pdfParse = require('pdf-parse/lib/pdf-parse.js')
+        const data = await pdfParse(fs.readFileSync(filePath))
+        text = data.text || ''
+      } else if (ext === '.docx' || ext === '.doc') {
+        const mammoth = require('mammoth')
+        const result = await mammoth.extractRawText({ path: filePath })
+        text = result.value || ''
+      } else {
+        text = fs.readFileSync(filePath, 'utf8')
+      }
+
+      const truncated = text.length > MAX_EXTRACT_CHARS
+      return {
+        ok: true,
+        name: path.basename(filePath),
+        text: truncated ? text.slice(0, MAX_EXTRACT_CHARS) : text,
+        chars: text.length,
+        truncated,
+      }
+    } catch (err) {
+      return { ok: false, error: err?.message || 'Could not read this file.' }
     }
   })
 
@@ -434,7 +547,7 @@ function register(ipcMain) {
   })
 
   // Blocking send — full response returned once complete
-  ipcMain.handle('ai:sendMessage', async (_, conversationId, message) => {
+  ipcMain.handle('ai:sendMessage', async (_, conversationId, message, opts) => {
     try {
       const conversation = dbGetConversation(conversationId)
       if (!conversation) return { error: 'Conversation not found' }
@@ -446,6 +559,7 @@ function register(ipcMain) {
 
       const res = await httpPost('/api/chat', {
         model: conversation.model, messages: providerMsgs, stream: false,
+        options: buildChatOptions(opts),
       })
       if (!res.ok) return { error: `Ollama error ${res.status}` }
 
@@ -465,7 +579,7 @@ function register(ipcMain) {
 
   // Streaming send — returns { requestId, userMessage } immediately, then
   // pushes ai:stream:start / ai:stream:chunk / ai:stream:done / ai:stream:error events.
-  ipcMain.handle('ai:streamMessage', (event, conversationId, message) => {
+  ipcMain.handle('ai:streamMessage', (event, conversationId, message, opts) => {
     const requestId = randomUUID()
     try {
       const conversation = dbGetConversation(conversationId)
@@ -488,7 +602,7 @@ function register(ipcMain) {
 
       httpPostStream(
         '/api/chat',
-        { model: conversation.model, messages: providerMsgs, stream: true },
+        { model: conversation.model, messages: providerMsgs, stream: true, options: buildChatOptions(opts) },
 
         // onLine — called for every parsed NDJSON object from Ollama
         (parsed) => {
@@ -560,4 +674,4 @@ function register(ipcMain) {
   })
 }
 
-module.exports = { register }
+module.exports = { register, extractCatalogMetadata, generateEmbedding, EMBED_MODEL }

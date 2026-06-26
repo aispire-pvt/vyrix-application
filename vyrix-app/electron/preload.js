@@ -79,6 +79,7 @@ contextBridge.exposeInMainWorld("vyrix", {
     // ── AI ────────────────────────────────────────────────────────────────────
     ai: {
         health:                   ()                         => ipcRenderer.invoke("ai:health"),
+        extractFile:              (filePath)                 => ipcRenderer.invoke("ai:extractFile", filePath),
         getOrCreateConversation:  (params)                   => ipcRenderer.invoke("ai:getOrCreateConversation", params),
         getConversation:          (id)                       => ipcRenderer.invoke("ai:getConversation", id),
         listConversations:        (projectId)                => ipcRenderer.invoke("ai:listConversations", projectId),

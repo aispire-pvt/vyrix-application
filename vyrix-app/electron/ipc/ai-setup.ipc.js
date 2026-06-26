@@ -19,6 +19,7 @@ const { spawn, execFile } = require('child_process')
 const OLLAMA_HOST = '127.0.0.1'
 const OLLAMA_PORT = 11434
 const DEFAULT_MODEL = process.env.DEFAULT_CHAT_MODEL || 'llama3.2:3b'
+const EMBED_MODEL   = process.env.EMBED_MODEL || 'nomic-embed-text'
 
 // Ollama installer download URLs (official Ollama releases)
 const OLLAMA_INSTALLERS = {
@@ -198,6 +199,16 @@ function register(ipcMain) {
         await pullModel(DEFAULT_MODEL, (pct, status) => {
             event.sender.send('ai:setup:progress', { stage: 'pulling', percent: pct, message: status ? `${status} ${pct ?? ''}%`.trim() : 'Downloading model…' })
         })
+
+        // Also pull the embedding model used for catalog vectors (best-effort —
+        // a failure here must not fail the whole setup; embeddings degrade gracefully).
+        try {
+            event.sender.send('ai:setup:progress', { stage: 'pulling', percent: 0, message: `Downloading embeddings model ${EMBED_MODEL}…` })
+            await pullModel(EMBED_MODEL, (pct, status) => {
+                event.sender.send('ai:setup:progress', { stage: 'pulling', percent: pct, message: status ? `${status} ${pct ?? ''}%`.trim() : 'Downloading embeddings model…' })
+            })
+        } catch { /* embeddings will simply be skipped until the model is present */ }
+
         event.sender.send('ai:setup:progress', { stage: 'ready', percent: 100, message: 'AI is ready.' })
         return { ok: true }
     })

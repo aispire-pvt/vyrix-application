@@ -13,6 +13,9 @@ export default defineConfig({
                     "better-sqlite3",
                     "electron-store",
                     "electron-updater",
+                    "pdf-parse",
+                    "mammoth",
+                    /^pdf-parse\//,   // subpath import: pdf-parse/lib/pdf-parse.js
                 ],
             },
         },

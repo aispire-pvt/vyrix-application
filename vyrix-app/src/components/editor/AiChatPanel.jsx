@@ -76,7 +76,8 @@ export default function AiChatPanel({ onClose, glass = false, projectId, docCont
 
     let streamRes
     try {
-      streamRes = await window.vyrix.ai.streamMessage(convId, fullText)
+      // In-editor chatbot uses the lightweight 4k window (no file attachments here).
+      streamRes = await window.vyrix.ai.streamMessage(convId, fullText, { num_ctx: 4096 })
     } catch (err) {
       showPanelError(err?.message || 'Failed to contact AI backend.')
       return
