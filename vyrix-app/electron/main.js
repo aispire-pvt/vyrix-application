@@ -100,7 +100,11 @@ if (firstLaunchUrl) pendingDeepLink = { __pendingUrl: firstLaunchUrl };
 //   - It's already running (port conflict — Ollama exits immediately)
 //   - macOS/Windows auto-started it at login
 function tryStartOllama() {
-    const proc = spawn("ollama", ["serve"], {
+    // Resolve the real install path (not just PATH) so a freshly-installed
+    // Ollama starts even though the running process's PATH predates the install.
+    let bin = "ollama";
+    try { bin = aiSetupIpc.resolveOllamaBin(); } catch {}
+    const proc = spawn(bin, ["serve"], {
         detached: true,
         stdio: "ignore",
         windowsHide: true,

@@ -102,9 +102,35 @@ function runOllamaInstaller(installerPath, platform) {
     })
 }
 
+// Resolve the Ollama binary by its real install location. Bare 'ollama' relies
+// on PATH, which a *freshly* installed Ollama isn't on for the already-running
+// Electron process — the root cause of "model not found" right after install
+// on Windows. We probe the known install dirs first, then fall back to PATH.
+function resolveOllamaBin() {
+    let candidates = []
+    if (process.platform === 'win32') {
+        const la = process.env.LOCALAPPDATA || ''
+        const pf = process.env.PROGRAMFILES || 'C:\\Program Files'
+        candidates = [
+            path.join(la, 'Programs', 'Ollama', 'ollama.exe'),
+            path.join(pf, 'Ollama', 'ollama.exe'),
+        ]
+    } else if (process.platform === 'darwin') {
+        candidates = [
+            '/usr/local/bin/ollama',
+            '/opt/homebrew/bin/ollama',
+            '/Applications/Ollama.app/Contents/Resources/ollama',
+        ]
+    }
+    for (const c of candidates) {
+        try { if (fs.existsSync(c)) return c } catch {}
+    }
+    return 'ollama' // PATH fallback (works once it IS on PATH)
+}
+
 function startOllama() {
     try {
-        const proc = spawn('ollama', ['serve'], { detached: true, stdio: 'ignore', windowsHide: true })
+        const proc = spawn(resolveOllamaBin(), ['serve'], { detached: true, stdio: 'ignore', windowsHide: true })
         proc.unref()
         proc.on('error', () => {})
     } catch {}
@@ -188,7 +214,18 @@ function register(ipcMain) {
 
         event.sender.send('ai:setup:progress', { stage: 'starting', percent: null, message: 'Starting Ollama…' })
         startOllama()
-        await waitForOllama(60000)
+        try {
+            await waitForOllama(60000)
+        } catch {
+            // Installed but the server didn't come up automatically — give an
+            // actionable next step instead of a silent timeout. Launching Ollama
+            // once registers it to auto-start at login thereafter.
+            throw new Error(
+                process.platform === 'win32'
+                    ? 'Ollama was installed but did not start automatically. Open "Ollama" from the Start menu once, then click Retry.'
+                    : 'Ollama was installed but did not start. Launch the Ollama app, then click Retry.'
+            )
+        }
 
         event.sender.send('ai:setup:progress', { stage: 'installed', percent: 100, message: 'Ollama is ready.' })
         return { ok: true }
@@ -214,4 +251,4 @@ function register(ipcMain) {
     })
 }
 
-module.exports = { register }
+module.exports = { register, resolveOllamaBin }
