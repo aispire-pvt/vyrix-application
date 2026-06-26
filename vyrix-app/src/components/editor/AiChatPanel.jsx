@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import aiIcon from '../../assets/editor/ai.png'
+import ChatMarkdown from '../ai/ChatMarkdown'
 
 // Right-side AI chat panel (Figma 288:1755 / 288:2234).
 // Wired to Ollama via Electron IPC with streaming support.
@@ -184,7 +185,7 @@ export default function AiChatPanel({ onClose, glass = false, projectId, docCont
                   <span className="h-[5px] w-[5px] animate-bounce rounded-full bg-[#555]" style={{ animationDelay: '300ms' }} />
                 </span>
               ) : (
-                m.text
+                <ChatMarkdown tone="light">{m.text}</ChatMarkdown>
               )}
             </div>
           )

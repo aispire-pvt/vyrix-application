@@ -4,6 +4,7 @@ import Sidebar from '../components/home/Sidebar'
 import Navbar from '../components/home/Navbar'
 import TodoPanel from '../components/home/TodoPanel'
 import AISetupModal from '../components/ai/AISetupModal'
+import ChatMarkdown from '../components/ai/ChatMarkdown'
 
 // AI Page assets — GRADIENT 1 (the signature dark blue-purple gradient).
 const imgVector15 = 'https://www.figma.com/api/mcp/asset/5e9d9fff-f342-4fc8-9935-fdf30f756d9d'
@@ -388,8 +389,10 @@ export default function AI() {
                           <span className="h-[6px] w-[6px] animate-bounce rounded-full bg-[#8d8d97]" style={{ animationDelay: '150ms' }} />
                           <span className="h-[6px] w-[6px] animate-bounce rounded-full bg-[#8d8d97]" style={{ animationDelay: '300ms' }} />
                         </span>
+                      ) : msg.role === 'user' ? (
+                        <span className="whitespace-pre-wrap">{msg.text}</span>
                       ) : (
-                        msg.text
+                        <ChatMarkdown>{msg.text}</ChatMarkdown>
                       )}
                     </div>
                   </div>
