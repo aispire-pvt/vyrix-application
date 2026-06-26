@@ -115,6 +115,12 @@ function register(ipcMain) {
         clearToken();
         store.delete("contributorId");
         store.delete("contributorDisplay");
+        // Clear cached legal acceptance so a different account on the same
+        // machine can't inherit this user's accepted state and skip the gate.
+        store.delete("legal.ndaAcceptedAt");
+        store.delete("legal.termsAcceptedAt");
+        store.delete("legal.privacyAcceptedAt");
+        store.delete("legal.acceptedBy");
         return { ok: true };
     });
 
@@ -122,11 +128,11 @@ function register(ipcMain) {
         return apiFetch("/api/auth/me");
     });
 
-    ipcMain.handle("auth:heartbeat", async (_, appVersion) => {
+    ipcMain.handle("auth:heartbeat", async () => {
         try {
             const res = await apiFetch("/api/auth/heartbeat", {
                 method: "POST",
-                body:   { appVersion },
+                body:   { appVersion: app.getVersion() },
             });
             // Drain offline sync queue on every successful heartbeat
             const { drainQueue } = require("./sync.ipc");

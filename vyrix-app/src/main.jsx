@@ -4,9 +4,10 @@ import { HashRouter } from 'react-router-dom'
 import App from './App.jsx'
 import './index.css'
 
-// Heartbeat + drain offline sync queue on every app launch
+// Heartbeat + drain offline sync queue on every app launch.
+// The real app version is filled in by the main process (app.getVersion()).
 if (window.vyrix) {
-  window.vyrix.heartbeat('0.1.0').catch(() => {})
+  window.vyrix.heartbeat().catch(() => {})
   window.vyrix.sync.drain().catch(() => {})
 }
 
